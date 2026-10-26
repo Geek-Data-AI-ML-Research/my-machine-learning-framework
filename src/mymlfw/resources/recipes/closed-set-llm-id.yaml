@@ -1,0 +1,9 @@
+id: closed-set-llm-id
+tags: [text, closed-set]
+summary: Shrunk TwinHead, log-linear blend, and a class-bias prior.
+modality: text
+signatures:
+  target_type: multiclass
+  has_group_col: true
+  has_text_col: true
+  n_classes_min: 10

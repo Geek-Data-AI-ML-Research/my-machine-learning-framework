@@ -1,0 +1,127 @@
+mymlfw 0.1.0
+
+CLI python -m mymlfw version
+import mymlfw
+
+CLI python -m mymlfw profile-data --dir data/
+from mymlfw.campaign import profile_dir
+
+CLI python -m mymlfw probe register --ledger ledger/experiments.csv --experiment-id ID --baseline-id BASE --variable NAME --band-low 0 --band-high 1
+from mymlfw.campaign import register_probe
+
+CLI python -m mymlfw probe update-cv --ledger ledger/experiments.csv --experiment-id ID --cv-mean 0.1
+from mymlfw.campaign import update_cv
+
+CLI python -m mymlfw probe score --ledger ledger/experiments.csv --experiment-id ID --public-score 0.1
+from mymlfw.campaign import record_public_score
+
+CLI python -m mymlfw probe verdict --ledger ledger/experiments.csv --experiment-id ID --verdict kill
+from mymlfw.campaign import set_verdict
+
+CLI python -m mymlfw probe sha --ledger ledger/experiments.csv --experiment-id ID --artifact submission.parquet
+from mymlfw.campaign import set_artifact_sha
+
+CLI python -m mymlfw blend optimize --oof a.npz --labels y.csv --manifest manifest.json --metric log_loss
+CLI python -m mymlfw blend diversity --oof a.npz --cv 0.5
+from mymlfw.blend import align, blend, diversity_matrix, optimize_weights
+
+CLI python -m mymlfw blend reorder-classes --target a.npz --source b.npz --out c.npz
+from mymlfw.blend.reorder import reorder_classes
+
+CLI python -m mymlfw diagnose-oof --oof oof.npz --train train.csv --out ERROR_AUTOPSY.md
+from mymlfw.blend import diagnose_oof
+
+CLI python -m mymlfw check-shift --train train.csv --test test.csv --numeric col
+from mymlfw.blend import check_shift
+
+CLI python -m mymlfw simulate-test --train train.csv --rows 25000 --out scale.json
+from mymlfw.kernel import simulate_test
+
+CLI python -m mymlfw kernel build --src kernel/src --out contest.ipynb --payload worker.py
+from mymlfw.kernel import build_notebook
+
+CLI python -m mymlfw pack-deps --requirements reqs.txt --out dataset_wheels --dry-run
+from mymlfw.kernel import pack_deps
+
+CLI python -m mymlfw preflight --require-scale-report --ledger ledger/experiments.csv --experiment-id ID --artifact submission.parquet --gate gate.json --leak leak.json --runtime runtime.json --kernel kernel-metadata.json --scale-report scale.json
+from mymlfw.submit import preflight
+
+CLI python -m mymlfw submit check --kind id_label --file submission.csv --classes a,b
+from mymlfw.submit import check_id_label
+
+CLI python -m mymlfw train lora --dry-run --train train.csv --ledger ledger/experiments.csv --experiment-id ID --baseline-id BASE --variable NAME --band-low 0 --band-high 1
+from mymlfw.train.lora import lora_dry_run
+
+CLI python -m mymlfw train soup --adapter a.safetensors --weight 1 --out soup
+from mymlfw.train.soup import soup_adapters
+
+CLI python -m mymlfw train grpo --groups groups.json
+from mymlfw.train.grpo import advantages
+
+CLI python -m mymlfw new-contest NAME --dest .
+from mymlfw.scaffold import new_contest
+
+CLI python -m mymlfw recipes --match ranking
+from mymlfw.scaffold import list_recipes
+
+CLI python -m mymlfw archive-contest --ledger ledger/experiments.csv --playbook recipes/GRANDMASTER_PLAYBOOK.md
+from mymlfw.scaffold import archive_contest
+
+CLI python -m mymlfw recipes --show ID
+from mymlfw.scaffold import show_recipe
+
+CLI python -m mymlfw remember --tag TAG --rule TEXT
+from mymlfw.scaffold import remember
+
+CLI python -m mymlfw episode add --contest NAME --task TEXT --actions TEXT --outcome worked --lesson TEXT
+from mymlfw.rag.episodes import add_episode
+
+CLI python -m mymlfw episode recall --task TEXT
+from mymlfw.rag.episodes import recall
+
+CLI python -m mymlfw ingest --path DIR --mode repo
+from mymlfw.rag.ingest import ingest
+
+CLI python -m mymlfw search --query TEXT --type code_pattern
+from mymlfw.rag.ingest import search
+
+CLI python -m mymlfw advise --dir CONTEST
+from mymlfw.rag.advise import advise
+
+CLI python -m mymlfw analyze --dir CONTEST
+from mymlfw.rag.analyze import analyze
+
+CLI python -m mymlfw promote-plugin FILE.py --category blend
+from mymlfw.scaffold import promote_plugin
+
+CLI python -m mymlfw sync-docs
+from mymlfw.scaffold import sync_llms_index
+
+from mymlfw.cv import run_oof
+from mymlfw.metrics import balanced_accuracy, mrr_at_k
+from mymlfw.train import SklearnHead, TwinHead
+from mymlfw.engines import AgentZipEngine, BenchmarkEngine, PortfolioEngine, RankedCandidateEngine, TextBlendEngine
+CLI python -m mymlfw cloud launch --project NAME --role primary --gpu T4 --command CMD --idle-kill 30 --max-runtime 120 --ledger ledger/experiments.csv --experiment-id ID --baseline-id BASE --variable NAME --band-low 0 --band-high 1 --out cloud/rendered.sh
+from mymlfw.cloud import JobSpec, render_launch
+from mymlfw.sanitize import guard_row, prepare_frame
+from mymlfw.paths import resolve_data_dir
+
+DO NOT write custom GroupKFold loops; call mymlfw.cv.run_oof.
+DO NOT fit feature clusters on the held-out fold.
+DO NOT fit temperature on the fold being scored.
+DO NOT add raw logits; convert with log_softmax before a probability pool.
+DO NOT drop a branch unless on_mismatch="drop_and_warn".
+DO NOT import mymlfw.train.lora from an engine.
+DO NOT put weights in the notebook payload.
+DO NOT enable kernel internet.
+DO NOT register a second variable in one probe.
+DO NOT launch cloud without CLOUD_APPROVAL.
+
+<!-- mymlfw-index -->
+recipe benchmark: items.jsonl plus a scorer callable.
+recipe circuit-portfolio: Verified portfolio and receipt hashes.
+recipe closed-set-llm-id: Shrunk TwinHead, log-linear blend, and a class-bias prior.
+recipe code-agent: Two-stage LoRA, syntax and exec rewards, zip bundle.
+recipe grouped-text: Text and a group column with no class-count floor.
+recipe ranking: Ranked channels, MRR, one variable per probe.
+<!-- /mymlfw-index -->

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+*.pyc
+recipes/memory.db
+recipes/memory.db-wal
+recipes/memory.db-shm

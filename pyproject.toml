@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mymlfw"
+version = "0.1.0"
+description = "Campaign, blend, and submission toolkit for ML and Kaggle work."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "pandas",
+  "scikit-learn",
+  "pyarrow",
+  "scipy",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+train = ["torch", "transformers", "peft", "safetensors"]
+dev = ["pytest"]
+
+[project.scripts]
+mymlfw = "mymlfw.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mymlfw = ["resources/llms.txt", "resources/recipes/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

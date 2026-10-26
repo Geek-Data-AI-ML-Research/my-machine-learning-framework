@@ -1,0 +1,8 @@
+id: code-agent
+tags: [code, agent]
+summary: Two-stage LoRA, syntax and exec rewards, zip bundle.
+modality: code
+signatures:
+  target_type: code
+  has_group_col: false
+  has_text_col: true

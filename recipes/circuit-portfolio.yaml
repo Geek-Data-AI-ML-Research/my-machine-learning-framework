@@ -1,0 +1,7 @@
+id: circuit-portfolio
+tags: [portfolio, circuits]
+summary: Verified portfolio and receipt hashes.
+modality: optimization
+signatures:
+  has_group_col: false
+  has_text_col: false

@@ -1,0 +1,8 @@
+id: grouped-text
+tags: [text, group]
+summary: Text and a group column with no class-count floor.
+modality: text
+signatures:
+  target_type: binary
+  has_group_col: true
+  has_text_col: true

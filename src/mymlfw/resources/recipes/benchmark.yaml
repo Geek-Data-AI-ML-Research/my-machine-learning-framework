@@ -1,0 +1,8 @@
+id: benchmark
+tags: [benchmark, eval]
+summary: items.jsonl plus a scorer callable.
+modality: eval
+signatures:
+  target_type: multiclass
+  has_group_col: false
+  has_text_col: true

@@ -1,0 +1,8 @@
+id: ranking
+tags: [ranking, mrr]
+summary: Ranked channels, MRR, one variable per probe.
+modality: retrieval
+signatures:
+  target_type: ranking
+  has_group_col: false
+  has_text_col: false
