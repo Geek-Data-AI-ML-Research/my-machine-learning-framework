@@ -1,4 +1,5 @@
 mymlfw 0.1.0
+docs docs/index.md
 
 CLI python -m mymlfw version
 import mymlfw

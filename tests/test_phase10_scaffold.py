@@ -301,6 +301,26 @@ def test_packaged_resources_match_the_checkout_and_install_fallback(monkeypatch)
     assert "sync-docs" in (repo_root() / "llms.txt").read_text()
 
 
+def test_docs_map_links_resolve():
+    import re
+    from pathlib import Path
+
+    root = repo_root()
+    pages = [root / "README.md", root / "AGENTS.md", *sorted((root / "docs").rglob("*.md"))]
+    link = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+    assert pages
+    for page in pages:
+        for target in link.findall(page.read_text()):
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            relative = target.split("#", 1)[0]
+            if not relative:
+                continue
+            assert (page.parent / relative).resolve().is_file(), f"{page} -> {target}"
+    assert "docs/index.md" in (root / "README.md").read_text()
+    assert "docs docs/index.md" in (root / "llms.txt").read_text()
+
+
 def test_sync_docs_exits_zero():
     completed = subprocess.run(
         [sys.executable, "-m", "mymlfw", "sync-docs"],

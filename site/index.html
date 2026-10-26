@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>mymlfw</title>
+    <meta name="description" content="Local toolkit for ML and Kaggle contests. One ledger, a submit gate, and memory for a coding agent.">
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f4f1;
+        --fg: #1c1917;
+        --muted: #57534e;
+        --line: #d6d3d1;
+        --code-bg: #fff;
+        --accent: #9a3412;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1c1917;
+          --fg: #f5f5f4;
+          --muted: #a8a29e;
+          --line: #44403c;
+          --code-bg: #292524;
+          --accent: #fdba74;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+      a { color: var(--accent); }
+      a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      main {
+        width: min(720px, calc(100% - 32px));
+        margin: 40px auto 72px;
+      }
+      ascii-banner.title {
+        display: block;
+        width: min(100%, 640px);
+        margin: 0 0 12px;
+      }
+      ascii-art.lead {
+        display: block;
+        font-size: 14px;
+        line-height: 1.35;
+        min-height: 1.35em;
+        margin: 0 0 28px;
+      }
+      ascii-banner.section {
+        display: block;
+        font-size: 13px;
+        line-height: 1.1;
+        color: var(--accent);
+        margin: 36px 0 10px;
+      }
+      p, li { color: var(--fg); }
+      .muted { color: var(--muted); }
+      main > pre {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        overflow-x: auto;
+        background: var(--code-bg);
+        border: 1px solid var(--line);
+      }
+      code { font-family: inherit; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0 0 16px;
+      }
+      th, td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px 8px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      th { color: var(--muted); font-weight: 500; }
+      footer {
+        margin-top: 40px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/ascii.rest@0.4.0/dist/ascii.js"
+      integrity="sha384-SBNELtJu9hcp9Nd2BljjmOuQ4VUromhUiD1ENpl5swn1R1vJCH7/qR3BsQmmOJZA"
+      crossorigin="anonymous"
+    ></script>
+    <main>
+      <ascii-banner
+        class="title"
+        text="mymlfw"
+        font="block"
+        shadow="rounded"
+        label="mymlfw"
+        options='{"color":{"light":"#9a3412","dark":"#fdba74"}}'
+      >mymlfw</ascii-banner>
+      <ascii-art
+        class="lead"
+        piece="typewriter"
+        label="python -m mymlfw"
+        options='{"prefix":"$ python -m mymlfw ","phrases":["version","new-contest demo --dest .","advise --dir .","analyze --dir ."]}'
+      >$ python -m mymlfw version</ascii-art>
+
+      <p>Version 0.1.0. A local toolkit for ML and Kaggle contests. It keeps one experiment ledger, checks blends and submissions, and gives a coding agent a memory of what already failed.</p>
+      <p class="muted">Python 3.11 or newer. One user. No account, no model host, and no call to Kaggle or a cloud provider.</p>
+
+      <ascii-banner class="section" text="install" font="slim" shadow="none" pixel="1" label="install">install</ascii-banner>
+      <pre><code>pip install -e .
+python -m mymlfw version</code></pre>
+      <p>The core install covers the ledger, GroupKFold, blends, the submit gate, the kernel builder, five engines, cloud script rendering, and retrieval. A real backward pass needs <code>pip install -e '.[train]'</code>.</p>
+
+      <ascii-banner class="section" text="first contest" font="slim" shadow="none" pixel="1" label="first contest">first contest</ascii-banner>
+      <pre><code>python -m mymlfw new-contest demo --dest .
+python -m mymlfw probe register \
+  --ledger demo/ledger/experiments.csv \
+  --experiment-id exp_001 \
+  --baseline-id base \
+  --variable lora_r=16 \
+  --band-low 0.70 \
+  --band-high 0.80
+python -m mymlfw analyze --dir demo</code></pre>
+      <p><code>analyze</code> prints JSON and writes nothing unless you pass <code>--out</code>. <code>next_steps</code> holds at most five items.</p>
+
+      <ascii-banner class="section" text="what it does" font="slim" shadow="none" pixel="1" label="what it does">what it does</ascii-banner>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>probe register</code></td><td>One variable and a public-score band in the ledger.</td></tr>
+          <tr><td><code>blend optimize</code></td><td>Weights for out-of-fold prediction bundles.</td></tr>
+          <tr><td><code>preflight</code></td><td>Refuses a closed probe, a hash mismatch, or a kernel with internet on.</td></tr>
+          <tr><td><code>advise --dir</code></td><td>A git worktree and <code>docs/MYMLFW_ADVICE.md</code>. Needs a commit and a clean tracked tree.</td></tr>
+          <tr><td><code>episode add</code></td><td>The lesson the agent records after the run. Advise does not write it.</td></tr>
+        </tbody>
+      </table>
+
+      <ascii-banner class="section" text="engines" font="slim" shadow="none" pixel="1" label="engines">engines</ascii-banner>
+      <table>
+        <thead>
+          <tr><th>Recipe</th><th>Class</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>closed-set-llm-id, grouped-text</td><td><code>TextBlendEngine</code></td></tr>
+          <tr><td>ranking</td><td><code>RankedCandidateEngine</code></td></tr>
+          <tr><td>code-agent</td><td><code>AgentZipEngine</code></td></tr>
+          <tr><td>circuit-portfolio</td><td><code>PortfolioEngine</code></td></tr>
+          <tr><td>benchmark</td><td><code>BenchmarkEngine</code></td></tr>
+        </tbody>
+      </table>
+
+      <ascii-banner class="section" text="for an agent" font="slim" shadow="none" pixel="1" label="for an agent">for an agent</ascii-banner>
+      <p>Read <code>llms.txt</code> in the checkout, then <code>AGENTS.md</code>. Failures are one JSON object on stderr with <code>error_code</code> and <code>suggested_fix</code>. Call <code>mymlfw.cv.run_oof</code> for grouped folds.</p>
+
+      <footer>
+        <p>Published with GitHub Pages from <code>site/index.html</code>. Letters and the typed line are <a href="https://ascii.rest/">ascii.rest</a> 0.4.0.</p>
+      </footer>
+    </main>
+  </body>
+</html>
