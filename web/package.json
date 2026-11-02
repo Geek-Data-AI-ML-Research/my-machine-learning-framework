@@ -1,0 +1,14 @@
+{
+  "name": "mymlfw-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Campaign SaaS console (ascii.rest). Wave 1 ships a monospace shell in public/.",
+  "scripts": {
+    "dev": "python3 -m http.server 5173 --directory public",
+    "note": "echo 'Install ascii skill: npx skills add bas3line/ascii; pin ascii.rest ^0.4'"
+  },
+  "comments": {
+    "ascii": "npx skills add bas3line/ascii",
+    "dependency": "ascii.rest >=0.4 (Phase B+)"
+  }
+}

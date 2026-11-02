@@ -1,0 +1,94 @@
+# Campaign SaaS local stack (Wave 1).
+# Host ports for mongo/redis/minio bind 127.0.0.1 only.
+# control_plane_internal is internal:true (no external egress).
+
+name: mymlfw
+
+services:
+  mongodb:
+    image: mongodb/mongodb-atlas-local:8.0
+    ports:
+      - "127.0.0.1:27017:27017"
+    networks:
+      - control_plane_internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - control_plane_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: mymlfw
+      MINIO_ROOT_PASSWORD: mymlfwsecret
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    networks:
+      - control_plane_internal
+    # Image may lack curl/mc; Wave 1 does not gate on MinIO readiness.
+    healthcheck:
+      test: ["CMD", "kill", "-0", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      MYMLFW_ENV: dev
+      MYMLFW_MONGO_URI: mongodb://mongodb:27017/?directConnection=true
+      MYMLFW_MONGO_DB: mymlfw
+      MYMLFW_REDIS_URL: redis://redis:6379/0
+      MYMLFW_GITHUB_OAUTH_STUB: "true"
+      MYMLFW_CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:3000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - control_plane_internal
+      - edge
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+
+networks:
+  control_plane_internal:
+    internal: true
+  edge:
+    driver: bridge
