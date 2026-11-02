@@ -3,27 +3,29 @@
 from __future__ import annotations
 
 from datetime import UTC
+from decimal import Decimal
 from typing import Any
 
 from bson.binary import BinaryVector, BinaryVectorDtype
 from bson.codec_options import CodecOptions, TypeCodec, TypeRegistry
 from bson.decimal128 import Decimal128
-from pymongo import AsyncMongoClient, ReadPreference, WriteConcern
-from pymongo.read_concern import ReadConcern
+from pymongo import AsyncMongoClient, ReadPreference
 
 
 class _DecimalCodec(TypeCodec):
-    python_type = float  # type: ignore[assignment]
+    """Encode ``decimal.Decimal`` as BSON Decimal128 (money-adjacent values)."""
+
+    python_type = Decimal
     bson_type = Decimal128
 
-    def transform_python(self, value: float) -> Decimal128:
-        return Decimal128(str(value))
+    def transform_python(self, value: Decimal) -> Decimal128:
+        return Decimal128(value)
 
-    def transform_bson(self, value: Decimal128) -> Decimal128:
-        return value
+    def transform_bson(self, value: Decimal128) -> Decimal:
+        return value.to_decimal()
 
 
-def _saas_codec_options() -> CodecOptions:
+def saas_codec_options() -> CodecOptions:
     registry = TypeRegistry([_DecimalCodec()])
     return CodecOptions(tz_aware=True, tzinfo=UTC, type_registry=registry)
 
@@ -47,15 +49,19 @@ def create_saas_mongo_client(
         appname=appname,
         tz_aware=True,
         tzinfo=UTC,
-        codec_options=_saas_codec_options(),
         w="majority",
         readConcernLevel="majority",
-        # Explicit defaults mirrored for callers that inspect kwargs later.
-        write_concern=WriteConcern(w="majority"),
         read_preference=ReadPreference.PRIMARY,
-        read_concern=ReadConcern(level="majority"),
     )
+    # Stash for get_saas_database / tests (client-level codec_options is read-only).
+    client._mymlfw_codec_options = saas_codec_options()  # type: ignore[attr-defined]
     return client
+
+
+def get_saas_database(client: AsyncMongoClient, name: str) -> Any:
+    """Return a database handle with tz-aware UTC + Decimal128 codec options."""
+    opts = getattr(client, "_mymlfw_codec_options", None) or saas_codec_options()
+    return client.get_database(name, codec_options=opts)
 
 
 def pack_embedding_f32(values: list[float] | tuple[float, ...]) -> BinaryVector:
@@ -70,7 +76,7 @@ def pack_embedding_f32(values: list[float] | tuple[float, ...]) -> BinaryVector:
 
 def client_codec_is_tz_aware(client: AsyncMongoClient) -> bool:
     """Test helper: codec options used by the client are tz-aware UTC."""
-    opts: CodecOptions = client.codec_options  # type: ignore[assignment]
+    opts: CodecOptions = getattr(client, "_mymlfw_codec_options", None) or client.codec_options
     return bool(opts.tz_aware) and opts.tzinfo is UTC
 
 
