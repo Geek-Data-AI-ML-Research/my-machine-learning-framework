@@ -1,6 +1,355 @@
 {
   "components": {
     "schemas": {
+      "DashboardDeadEndsPanel": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "top_variables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Top Variables",
+            "type": "array"
+          }
+        },
+        "title": "DashboardDeadEndsPanel",
+        "type": "object"
+      },
+      "DashboardGoalsPanel": {
+        "additionalProperties": false,
+        "properties": {
+          "abandoned": {
+            "default": 0,
+            "title": "Abandoned",
+            "type": "integer"
+          },
+          "active": {
+            "default": 0,
+            "title": "Active",
+            "type": "integer"
+          },
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "met": {
+            "default": 0,
+            "title": "Met",
+            "type": "integer"
+          }
+        },
+        "title": "DashboardGoalsPanel",
+        "type": "object"
+      },
+      "DashboardHeader": {
+        "additionalProperties": false,
+        "properties": {
+          "adv_auc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adv Auc"
+          },
+          "adv_auc_label": {
+            "default": "UNKNOWN",
+            "title": "Adv Auc Label",
+            "type": "string"
+          },
+          "folds_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folds Sha256"
+          },
+          "goals_met_ratio": {
+            "title": "Goals Met Ratio",
+            "type": "number"
+          },
+          "lever_close_rate": {
+            "title": "Lever Close Rate",
+            "type": "number"
+          },
+          "mission_success_rate": {
+            "title": "Mission Success Rate",
+            "type": "number"
+          },
+          "primary_goal_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Goal Id"
+          },
+          "primary_goal_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Goal Title"
+          },
+          "primary_status": {
+            "default": "OPEN",
+            "enum": [
+              "MET",
+              "MISSED",
+              "OPEN"
+            ],
+            "title": "Primary Status",
+            "type": "string"
+          },
+          "primary_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Threshold"
+          },
+          "progress_pct": {
+            "title": "Progress Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "progress_pct",
+          "goals_met_ratio",
+          "lever_close_rate",
+          "mission_success_rate"
+        ],
+        "title": "DashboardHeader",
+        "type": "object"
+      },
+      "DashboardLeversPanel": {
+        "additionalProperties": false,
+        "properties": {
+          "closed": {
+            "default": 0,
+            "title": "Closed",
+            "type": "integer"
+          },
+          "fold_badges": {
+            "items": {
+              "$ref": "#/components/schemas/FoldSnrBadge"
+            },
+            "title": "Fold Badges",
+            "type": "array"
+          },
+          "kills": {
+            "default": 0,
+            "title": "Kills",
+            "type": "integer"
+          },
+          "open": {
+            "default": 0,
+            "title": "Open",
+            "type": "integer"
+          },
+          "promotes": {
+            "default": 0,
+            "title": "Promotes",
+            "type": "integer"
+          },
+          "sparkline": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sparkline",
+            "type": "array"
+          }
+        },
+        "title": "DashboardLeversPanel",
+        "type": "object"
+      },
+      "DashboardMissionsPanel": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "default": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "queued": {
+            "default": 0,
+            "title": "Queued",
+            "type": "integer"
+          },
+          "running": {
+            "default": 0,
+            "title": "Running",
+            "type": "integer"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer"
+          }
+        },
+        "title": "DashboardMissionsPanel",
+        "type": "object"
+      },
+      "DashboardResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "dead_ends": {
+            "$ref": "#/components/schemas/DashboardDeadEndsPanel"
+          },
+          "goals": {
+            "$ref": "#/components/schemas/DashboardGoalsPanel"
+          },
+          "header": {
+            "$ref": "#/components/schemas/DashboardHeader"
+          },
+          "levers": {
+            "$ref": "#/components/schemas/DashboardLeversPanel"
+          },
+          "missions": {
+            "$ref": "#/components/schemas/DashboardMissionsPanel"
+          },
+          "project_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "header",
+          "goals",
+          "levers",
+          "missions",
+          "dead_ends"
+        ],
+        "title": "DashboardResponse",
+        "type": "object"
+      },
+      "ErrorSliceItem": {
+        "additionalProperties": false,
+        "description": "Worst residual / hard-example slice after log_oof (MCP resource shape).",
+        "properties": {
+          "example_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Example Ids",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mean_residual": {
+            "title": "Mean Residual",
+            "type": "number"
+          },
+          "n_examples": {
+            "minimum": 0.0,
+            "title": "N Examples",
+            "type": "integer"
+          },
+          "slice_key": {
+            "title": "Slice Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slice_key",
+          "label",
+          "n_examples",
+          "mean_residual"
+        ],
+        "title": "ErrorSliceItem",
+        "type": "object"
+      },
+      "ErrorSlicesResource": {
+        "additionalProperties": false,
+        "description": "``mymlfw://projects/{id}/runs/{run_id}/error_slices`` stub payload.",
+        "properties": {
+          "generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "oof_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oof Id"
+          },
+          "run_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "slices": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorSliceItem"
+            },
+            "title": "Slices",
+            "type": "array"
+          },
+          "status": {
+            "default": "not_ready",
+            "enum": [
+              "empty",
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "ErrorSlicesResource",
+        "type": "object"
+      },
       "FeatureFlags": {
         "additionalProperties": false,
         "properties": {
@@ -32,6 +381,115 @@
         },
         "title": "FeatureFlags",
         "type": "object"
+      },
+      "FoldMeta": {
+        "additionalProperties": false,
+        "description": "Canonical folds.parquet registry metadata on a project.",
+        "properties": {
+          "adv_auc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adv Auc"
+          },
+          "artifact_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Key"
+          },
+          "epoch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epoch Id"
+          },
+          "folds_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folds Sha256"
+          },
+          "n_folds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Folds"
+          }
+        },
+        "title": "FoldMeta",
+        "type": "object"
+      },
+      "FoldSnrBadge": {
+        "additionalProperties": false,
+        "properties": {
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/components/schemas/FoldSnrLabel"
+          },
+          "n_folds": {
+            "title": "N Folds",
+            "type": "integer"
+          },
+          "snr": {
+            "title": "Snr",
+            "type": "number"
+          },
+          "win_ratio": {
+            "title": "Win Ratio",
+            "type": "number"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "wins",
+          "n_folds",
+          "win_ratio",
+          "snr",
+          "label",
+          "display"
+        ],
+        "title": "FoldSnrBadge",
+        "type": "object"
+      },
+      "FoldSnrLabel": {
+        "enum": [
+          "SOLID",
+          "NOISE"
+        ],
+        "title": "FoldSnrLabel",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -69,6 +527,121 @@
           "version"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "JobClaimRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capability Tags",
+            "type": "array"
+          },
+          "runner_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Runner Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner_id"
+        ],
+        "title": "JobClaimRequest",
+        "type": "object"
+      },
+      "JobClaimResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "claimed": {
+            "title": "Claimed",
+            "type": "boolean"
+          },
+          "credentials": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobScopedCredentials"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "claimed"
+        ],
+        "title": "JobClaimResponse",
+        "type": "object"
+      },
+      "JobScopedCredentials": {
+        "additionalProperties": false,
+        "description": "Minted on claim: 2h job_token + path-scoped presigns. No Mongo/KEK.",
+        "properties": {
+          "download_presigns": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Download Presigns",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "job_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_token": {
+            "title": "Job Token",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "sandbox_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sandbox Notes",
+            "type": "array"
+          },
+          "upload_presigns": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Upload Presigns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_token",
+          "expires_at"
+        ],
+        "title": "JobScopedCredentials",
         "type": "object"
       },
       "LoginRequest": {
@@ -127,6 +700,250 @@
         ],
         "title": "MeResponse",
         "type": "object"
+      },
+      "OofArtifactConfirmRequest": {
+        "additionalProperties": false,
+        "description": "Client asks API to HEAD the object and promote pending \u2192 ready.",
+        "properties": {
+          "expected_etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Etag"
+          }
+        },
+        "title": "OofArtifactConfirmRequest",
+        "type": "object"
+      },
+      "OofArtifactCreateRequest": {
+        "additionalProperties": false,
+        "description": "Create an OOF upload slot; response includes a pinned PUT presign.",
+        "properties": {
+          "content_length": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2147483648.0,
+            "title": "Content Length",
+            "type": "integer"
+          },
+          "content_sha256": {
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "experiment_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "filename": {
+            "default": "oof.npz",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "split_hash": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Hash"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "content_length",
+          "content_sha256"
+        ],
+        "title": "OofArtifactCreateRequest",
+        "type": "object"
+      },
+      "OofArtifactPresignResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "content_disposition": {
+            "default": "attachment",
+            "title": "Content Disposition",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "object_key": {
+            "title": "Object Key",
+            "type": "string"
+          },
+          "oof_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Oof Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "pending_upload",
+            "default": "pending_upload",
+            "title": "Status",
+            "type": "string"
+          },
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "oof_id",
+          "upload_url",
+          "object_key",
+          "expires_at"
+        ],
+        "title": "OofArtifactPresignResponse",
+        "type": "object"
+      },
+      "OofArtifactResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "content_length": {
+            "title": "Content Length",
+            "type": "integer"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etag"
+          },
+          "experiment_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "object_key": {
+            "title": "Object Key",
+            "type": "string"
+          },
+          "oof_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Oof Id",
+            "type": "string"
+          },
+          "ready_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "split_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Hash"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OofArtifactStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "oof_id",
+          "experiment_id",
+          "status",
+          "object_key",
+          "content_length",
+          "content_sha256",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "OofArtifactResponse",
+        "type": "object"
+      },
+      "OofArtifactStatus": {
+        "enum": [
+          "pending_upload",
+          "ready",
+          "expired"
+        ],
+        "title": "OofArtifactStatus",
+        "type": "string"
       },
       "OrgEntitlements": {
         "additionalProperties": false,
@@ -217,6 +1034,143 @@
         "title": "PersonaSwitchRequest",
         "type": "object"
       },
+      "ProjectKind": {
+        "enum": [
+          "standalone",
+          "kaggle"
+        ],
+        "title": "ProjectKind",
+        "type": "string"
+      },
+      "ProjectListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            },
+            "title": "Projects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "title": "ProjectListResponse",
+        "type": "object"
+      },
+      "ProjectSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "folds": {
+            "$ref": "#/components/schemas/FoldMeta"
+          },
+          "id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Id",
+            "type": "string"
+          },
+          "is_demo": {
+            "default": false,
+            "title": "Is Demo",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProjectKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "public_share_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Share Slug"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "kind"
+        ],
+        "title": "ProjectSummary",
+        "type": "object"
+      },
+      "PublicSnapshotCreate": {
+        "additionalProperties": false,
+        "description": "Publish a redacted PLG share (never a live ProjectGoalDoc dump).",
+        "properties": {
+          "include_dead_end_lessons": {
+            "default": false,
+            "title": "Include Dead End Lessons",
+            "type": "boolean"
+          },
+          "include_goals": {
+            "default": true,
+            "title": "Include Goals",
+            "type": "boolean"
+          },
+          "include_lever_stats": {
+            "default": true,
+            "title": "Include Lever Stats",
+            "type": "boolean"
+          }
+        },
+        "title": "PublicSnapshotCreate",
+        "type": "object"
+      },
+      "PublicSnapshotResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "entropy": {
+            "title": "Entropy",
+            "type": "string"
+          },
+          "org_slug": {
+            "title": "Org Slug",
+            "type": "string"
+          },
+          "project_slug": {
+            "title": "Project Slug",
+            "type": "string"
+          },
+          "redacted": {
+            "additionalProperties": true,
+            "title": "Redacted",
+            "type": "object"
+          },
+          "share_path": {
+            "title": "Share Path",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "org_slug",
+          "project_slug",
+          "share_path",
+          "redacted",
+          "entropy"
+        ],
+        "title": "PublicSnapshotResponse",
+        "type": "object"
+      },
       "RegisterRequest": {
         "additionalProperties": false,
         "properties": {
@@ -246,6 +1200,200 @@
         ],
         "title": "RegisterRequest",
         "type": "object"
+      },
+      "ResearchRunCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "goal_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "hardware_fingerprint": {
+            "default": "",
+            "maxLength": 512,
+            "minLength": 0,
+            "title": "Hardware Fingerprint",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ResearchRunMode",
+            "default": "fold0_smoke"
+          },
+          "notebook_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notebook Id"
+          },
+          "runner_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runner Id"
+          }
+        },
+        "title": "ResearchRunCreateRequest",
+        "type": "object"
+      },
+      "ResearchRunMode": {
+        "enum": [
+          "fold0_smoke",
+          "full_cv"
+        ],
+        "title": "ResearchRunMode",
+        "type": "string"
+      },
+      "ResearchRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "hardware_fingerprint": {
+            "default": "",
+            "title": "Hardware Fingerprint",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ResearchRunMode"
+          },
+          "run_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runner_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runner Id"
+          },
+          "status": {
+            "default": "queued",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "mode",
+          "created_at"
+        ],
+        "title": "ResearchRunResponse",
+        "type": "object"
+      },
+      "RunnerHeartbeatRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capability Tags",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RunnerKind",
+            "default": "local"
+          },
+          "runner_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Runner Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "idle",
+            "enum": [
+              "idle",
+              "busy",
+              "draining"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner_id"
+        ],
+        "title": "RunnerHeartbeatRequest",
+        "type": "object"
+      },
+      "RunnerHeartbeatResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "default": true,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "runner_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Runner Id",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner_id",
+          "server_time"
+        ],
+        "title": "RunnerHeartbeatResponse",
+        "type": "object"
+      },
+      "RunnerKind": {
+        "enum": [
+          "local",
+          "runpod_pod",
+          "runpod_serverless",
+          "aws_ec2"
+        ],
+        "title": "RunnerKind",
+        "type": "string"
       },
       "TokenResponse": {
         "additionalProperties": false,
@@ -573,7 +1721,7 @@
     },
     "/v1/events": {
       "get": {
-        "description": "SSE shell \u2014 Last-Event-ID multiplexing lands with live strips.",
+        "description": "SSE shell + kit train_strip hook (Motion = Active State while running).",
         "operationId": "events_stub_v1_events_get",
         "parameters": [
           {
@@ -708,6 +1856,864 @@
           }
         },
         "summary": "Current Org"
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "operationId": "list_projects_v1_projects_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Projects",
+        "tags": [
+          "brain"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}": {
+      "get": {
+        "operationId": "get_project_v1_projects__project_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project",
+        "tags": [
+          "brain"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/dashboard": {
+      "get": {
+        "description": "Single JSON board for web Overview + CLI ``project dashboard``.\n\nWhen Mongo is available, experiments use slim ``$project`` before ``$facet``;\nthe response shape is always ``DashboardResponse``.",
+        "operationId": "project_dashboard_v1_projects__project_id__dashboard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Dashboard",
+        "tags": [
+          "brain"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/oof-artifacts": {
+      "post": {
+        "operationId": "create_oof_artifact_v1_projects__project_id__oof_artifacts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OofArtifactCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OofArtifactPresignResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Oof Artifact",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/oof-artifacts/{oof_id}": {
+      "get": {
+        "operationId": "get_oof_artifact_v1_projects__project_id__oof_artifacts__oof_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "oof_id",
+            "required": true,
+            "schema": {
+              "title": "Oof Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OofArtifactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Oof Artifact",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/oof-artifacts/{oof_id}/confirm": {
+      "post": {
+        "operationId": "confirm_oof_artifact_v1_projects__project_id__oof_artifacts__oof_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "oof_id",
+            "required": true,
+            "schema": {
+              "title": "Oof Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OofArtifactConfirmRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OofArtifactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Oof Artifact",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/research-runs": {
+      "post": {
+        "operationId": "create_research_run_v1_projects__project_id__research_runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchRunCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Research Run",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/runs/{run_id}/error_slices": {
+      "get": {
+        "operationId": "get_error_slices_v1_projects__project_id__runs__run_id__error_slices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSlicesResource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Error Slices",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/share": {
+      "post": {
+        "operationId": "publish_share_v1_projects__project_id__share_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicSnapshotCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Share",
+        "tags": [
+          "brain"
+        ]
+      }
+    },
+    "/v1/public/{org_slug}/{slug}": {
+      "get": {
+        "operationId": "get_public_share_v1_public__org_slug___slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_slug",
+            "required": true,
+            "schema": {
+              "title": "Org Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Public Share V1 Public  Org Slug   Slug  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Public Share",
+        "tags": [
+          "brain"
+        ]
+      }
+    },
+    "/v1/runners/claim-job": {
+      "post": {
+        "operationId": "runner_claim_job_v1_runners_claim_job_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobClaimResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runner Claim Job",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/runners/heartbeat": {
+      "post": {
+        "operationId": "runner_heartbeat_v1_runners_heartbeat_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerHeartbeatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runner Heartbeat",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/runners/register": {
+      "post": {
+        "operationId": "register_local_runner_v1_runners_register_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerHeartbeatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Local Runner",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/studio/ensure-demo": {
+      "post": {
+        "description": "Seed Demo Campaign on first studio land (idempotent).",
+        "operationId": "ensure_demo_v1_studio_ensure_demo_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ensure Demo",
+        "tags": [
+          "brain"
+        ]
       }
     }
   }

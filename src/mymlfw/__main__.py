@@ -244,6 +244,22 @@ def _parser() -> argparse.ArgumentParser:
     promote.add_argument("--tests-dest", default=None)
 
     sub.add_parser("sync-docs", exit_on_error=False)
+
+    project_cmd = sub.add_parser("project", exit_on_error=False)
+    project_sub = project_cmd.add_subparsers(dest="project_cmd")
+    project_dash = project_sub.add_parser("dashboard", exit_on_error=False)
+    project_dash.add_argument("--project", required=True)
+    project_dash.add_argument(
+        "--api",
+        default=None,
+        help="API base URL (default MYMLFW_API or http://127.0.0.1:8000)",
+    )
+    project_dash.add_argument(
+        "--token",
+        default=None,
+        help="Bearer token (default MYMLFW_TOKEN)",
+    )
+
     return parser
 
 
@@ -576,6 +592,40 @@ def _dispatch(args) -> int:
 
         path = sync_llms_index()
         print(path)
+        return 0
+    if args.command == "project" and args.project_cmd == "dashboard":
+        import os
+        import urllib.error
+        import urllib.request
+
+        base = (
+            args.api
+            or os.environ.get("MYMLFW_API")
+            or "http://127.0.0.1:8000"
+        ).rstrip("/")
+        token = args.token or os.environ.get("MYMLFW_TOKEN") or ""
+        url = f"{base}/v1/projects/{args.project}/dashboard"
+        req = urllib.request.Request(url, method="GET")
+        req.add_header("X-Mymlfw-Client-Version", __version__)
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                print(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise MymlfwError(
+                "DASHBOARD_HTTP",
+                "Pass --token / MYMLFW_TOKEN and a valid --project.",
+                status=exc.code,
+                note=body,
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise MymlfwError(
+                "DASHBOARD_UNREACHABLE",
+                "Start the API (make dev) or pass --api.",
+                note=str(exc.reason),
+            ) from exc
         return 0
     raise MymlfwError("UNKNOWN_COMMAND", "Run python -m mymlfw version.")
 

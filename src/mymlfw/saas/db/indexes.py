@@ -53,12 +53,27 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
         "missions",
         "dead_ends",
         "runs",
+        "oof_artifacts",
         "daily_progress",
         "memory_chunks",
         "autopilot_nodes",
         "project_credits",
+        "project_axioms",
+        "public_snapshots",
     ):
         await db[name].create_indexes([_index_model(ESR_TENANT_TIMELINE)])
+
+    # Stale pending OOF uploads: query by status + created_at (TTL purge in worker).
+    await db["oof_artifacts"].create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("project_id", ASCENDING),
+            ("status", ASCENDING),
+            ("created_at", ASCENDING),
+        ],
+        name="oof_pending_upload",
+        partialFilterExpression={"status": "pending_upload", "deleted_at": None},
+    )
 
     missions = db["missions"]
     await missions.create_index(
@@ -69,6 +84,12 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
             ("lease_expires_at", ASCENDING),
         ],
         name="mission_queue_lease",
+    )
+
+    await db["public_snapshots"].create_index(
+        [("slug", ASCENDING)],
+        name="public_snapshots_slug_unique",
+        unique=True,
     )
 
     outbox = db["outbox_events"]
@@ -93,7 +114,29 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
         partialFilterExpression={"deleted_at": {"$type": "date"}},
     )
 
+    await _ensure_usage_events_timeseries(db)
     await _apply_json_schema(db)
+
+
+async def _ensure_usage_events_timeseries(db: AsyncDatabase) -> None:
+    """Create ``usage_events`` as a time-series collection when missing."""
+    names = await db.list_collection_names()
+    if "usage_events" in names:
+        return
+    try:
+        await db.create_collection(
+            "usage_events",
+            timeseries={
+                "timeField": "created_at",
+                "metaField": "meta",
+                "granularity": "seconds",
+            },
+            expireAfterSeconds=90 * 24 * 3600,
+        )
+    except Exception:
+        # Standalone / older servers may reject time-series; fall back to plain.
+        if "usage_events" not in await db.list_collection_names():
+            await db.create_collection("usage_events")
 
 
 _CORE_TENANT_SCHEMA: dict[str, Any] = {

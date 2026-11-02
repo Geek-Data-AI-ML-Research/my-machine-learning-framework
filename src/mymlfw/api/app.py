@@ -16,6 +16,7 @@ from mymlfw.api.idempotency import IdempotencyMiddleware
 from mymlfw.api.middleware import ClientVersionMiddleware
 from mymlfw.api.otel import setup_otel
 from mymlfw.api.public_route import public_route
+from mymlfw.api.routes_brain import router as brain_router
 from mymlfw.api.settings import Settings, get_settings
 from mymlfw.saas.schemas import (
     HealthResponse,
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(ClientVersionMiddleware, server_version=settings.api_version)
     app.add_middleware(IdempotencyMiddleware)
+    app.include_router(brain_router)
 
     @app.get("/health", response_model=HealthResponse)
     @public_route

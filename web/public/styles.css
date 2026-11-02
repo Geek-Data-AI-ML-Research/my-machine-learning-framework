@@ -94,3 +94,32 @@ button.linkish {
   padding-top: 1rem;
   border-top: 1px dashed var(--mute);
 }
+
+.board {
+  margin-top: 1rem;
+  white-space: pre-wrap;
+  color: var(--fg);
+}
+
+.palette {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--mute);
+  max-width: 48ch;
+}
+
+.palette-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+
+.palette-list li {
+  cursor: pointer;
+  padding: 0.2rem 0;
+  color: var(--mute);
+}
+
+.palette-list li:hover {
+  color: var(--accent);
+}
