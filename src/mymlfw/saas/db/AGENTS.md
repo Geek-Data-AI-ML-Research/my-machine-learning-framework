@@ -40,7 +40,8 @@ Zero-trust Mongo layer. **Only** this package may hold `AsyncMongoClient` / raw 
 | --- | --- |
 | `client.py` | `create_saas_mongo_client`, `pack_embedding_f32` |
 | `tenant_repo.py` | `ScopedCollection` |
-| `project_db.py` | `ProjectScopedDB` (+ claim fencing fields stub) |
+| `project_db.py` | `ProjectScopedDB` + `claim_next_mission` / `complete_mission_transactional` (fencing) |
+| `errors.py` | `StaleLeaseError` (409) / `MissionNotFoundError` |
 | `indexes.py` | `ensure_saas_indexes` |
 | `outbox.py` | outbox_events helpers |
 | `migrations.py` | schema_version migration runner stub |

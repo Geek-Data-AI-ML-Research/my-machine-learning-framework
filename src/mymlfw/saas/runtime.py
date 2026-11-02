@@ -41,14 +41,16 @@ async def open_control_plane_runtime(
         try:
             from mymlfw.saas.db.client import create_saas_mongo_client, get_saas_database
 
-            mongo_client = create_saas_mongo_client(uri, appname="mymlfw-control")
-            db = get_saas_database(mongo_client, db_name)
+            client = create_saas_mongo_client(uri, appname="mymlfw-control")
+            db = get_saas_database(client, db_name)
 
-            def factory(workspace_id: str, project_id: str) -> ProjectScopedDB:
+            def _project_db(workspace_id: str, project_id: str) -> ProjectScopedDB:
                 return ProjectScopedDB(
                     db, workspace_id=workspace_id, project_id=project_id
                 )
 
+            factory = _project_db
+            mongo_client = client
         except Exception:
             factory = None
             if mongo_client is not None:
