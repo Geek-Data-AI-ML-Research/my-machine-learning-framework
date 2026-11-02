@@ -213,12 +213,14 @@ def test_notebook_chunker_hypothesis_code_output_units():
     assert "class:Model" in units[1].ast_tags
 
 
-def test_ensemble_and_cloud_provider_hooks_are_stubs():
+def test_ensemble_ready_and_cloud_provider_hooks_are_stubs():
     from mymlfw.saas.autopilot import start_autopilot_stub
     from mymlfw.saas.ensemble import plan_ensemble
     from mymlfw.saas.providers import connect_provider_stub
 
-    assert plan_ensemble(["oof_1"])["status"] == "not_implemented"
+    plan = plan_ensemble(["oof_1", "oof_2"], mode="auto")
+    assert plan["status"] == "ready"
+    assert plan["mode"] == "auto"
     assert start_autopilot_stub()["feature_flag"] == "night_shift"
     assert connect_provider_stub("runpod")["feature_flag"] == "cloud_runners"
 

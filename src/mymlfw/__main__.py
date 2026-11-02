@@ -271,6 +271,33 @@ def _parser() -> argparse.ArgumentParser:
     runner_start.add_argument("--poll-seconds", type=float, default=5.0)
     runner_sub.add_parser("status", exit_on_error=False)
 
+    ensemble = sub.add_parser("ensemble", exit_on_error=False)
+    ensemble.add_argument("--project", required=True)
+    ensemble.add_argument(
+        "--mode",
+        choices=("linear", "rank", "logit", "geometric", "auto"),
+        default="auto",
+    )
+    ensemble.add_argument(
+        "--oof",
+        action="append",
+        default=[],
+        help="Local .npz with predictions/labels/folds (repeatable).",
+    )
+    ensemble.add_argument("--metric", choices=("auc", "log_loss", "mse"), default="auc")
+    ensemble.add_argument("--promote", action="store_true")
+    ensemble.add_argument("--no-polish", action="store_true")
+    ensemble.add_argument(
+        "--api",
+        default=None,
+        help="API base URL (default MYMLFW_API or http://127.0.0.1:8000)",
+    )
+    ensemble.add_argument(
+        "--token",
+        default=None,
+        help="Bearer token (default MYMLFW_TOKEN)",
+    )
+
     return parser
 
 
@@ -648,6 +675,117 @@ def _dispatch(args) -> int:
             print_json(runner_start(once=args.once, poll_seconds=args.poll_seconds))
             return 0
         raise MymlfwError("USAGE", "Use: mymlfw runner start|status")
+    if args.command == "ensemble":
+        import os
+
+        import numpy as np
+
+        from mymlfw.saas.ensemble import (
+            EnsembleError,
+            OofCandidate,
+            optimize_ensemble,
+            plan_ensemble,
+            promote_blend_to_experiment,
+            render_ensemble_ascii_board,
+        )
+
+        if args.oof:
+            cands: list[OofCandidate] = []
+            y = None
+            folds = None
+            for path in args.oof:
+                data = np.load(path, allow_pickle=False)
+                pred = data["predictions"]
+                name = str(data["name"]) if "name" in data.files else path
+                oof_id = str(data["oof_id"]) if "oof_id" in data.files else None
+                split_hash = (
+                    str(data["split_hash"]) if "split_hash" in data.files else None
+                )
+                cands.append(
+                    OofCandidate(
+                        name=name,
+                        predictions=pred,
+                        oof_id=oof_id,
+                        split_hash=split_hash,
+                    )
+                )
+                if y is None and "labels" in data.files:
+                    y = data["labels"]
+                if folds is None and "folds" in data.files:
+                    folds = data["folds"]
+            if y is None or folds is None:
+                raise MymlfwError(
+                    "ENSEMBLE_OOF",
+                    "Each --oof stack needs labels and folds in at least one .npz.",
+                )
+            try:
+                result = optimize_ensemble(
+                    cands,
+                    y=y,
+                    folds=folds,
+                    mode=args.mode,
+                    metric=args.metric,
+                    polish=not args.no_polish,
+                )
+            except EnsembleError as exc:
+                raise MymlfwError(exc.code.upper(), exc.message, **exc.extra) from exc
+            payload = result.to_dict()
+            print(render_ensemble_ascii_board(result), file=sys.stderr)
+            if args.promote:
+                parent_ids = [
+                    cid or f"oof_local_{i}" for i, cid in enumerate(result.candidate_oof_ids)
+                ]
+                promo = promote_blend_to_experiment(
+                    parent_oof_ids=parent_ids,
+                    weights=result.weights.tolist(),
+                    mode=result.mode,
+                    project_id=args.project,
+                    nested_cv_score=result.nested_cv_score,
+                    fold_scores=result.fold_scores,
+                )
+                payload["promote"] = promo
+            print(json.dumps(payload))
+            return 0
+
+        # Thin API wrapper when no local --oof files
+        import urllib.error
+        import urllib.request
+
+        base = (
+            args.api
+            or os.environ.get("MYMLFW_API")
+            or "http://127.0.0.1:8000"
+        ).rstrip("/")
+        token = args.token or os.environ.get("MYMLFW_TOKEN") or ""
+        plan = plan_ensemble([], mode=args.mode)
+        # Without oof ids, just print plan shape via API with empty body oof_ids
+        body = json.dumps({"mode": args.mode, "oof_ids": []}).encode("utf-8")
+        url = f"{base}/v1/projects/{args.project}/ensemble"
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("X-Mymlfw-Client-Version", __version__)
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                raw = resp.read().decode("utf-8")
+            print(raw)
+            _ = plan
+        except urllib.error.HTTPError as exc:
+            note = exc.read().decode("utf-8", errors="replace")
+            raise MymlfwError(
+                "ENSEMBLE_HTTP",
+                "Pass --token / MYMLFW_TOKEN, --oof files, or a reachable --api.",
+                status=exc.code,
+                note=note,
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise MymlfwError(
+                "ENSEMBLE_UNREACHABLE",
+                "Start the API (make dev), pass --api, or provide --oof .npz files.",
+                note=str(exc.reason),
+            ) from exc
+        return 0
     raise MymlfwError("UNKNOWN_COMMAND", "Run python -m mymlfw version.")
 
 

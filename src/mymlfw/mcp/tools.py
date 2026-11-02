@@ -211,3 +211,54 @@ async def tool_query_project_brain(
         detail_level=detail_level,
     )
     return result.model_dump(mode="json")
+
+
+async def tool_optimize_ensemble(
+    *,
+    project_id: str,
+    oof_ids: list[str],
+    pats: PatStore,
+    headers: dict[str, str] | None = None,
+    pat: str | None = None,
+    mode: str = "auto",
+    missions: MissionService | None = None,
+) -> dict[str, Any]:
+    """Thin MCP wrapper: plan nested-CV blend for ready OOF artifact ids."""
+    _ = missions
+    auth = resolve_auth_context(headers=headers, explicit_token=pat, store=pats)
+    _require_project(auth, project_id)
+    from mymlfw.saas.ensemble import plan_ensemble
+
+    return plan_ensemble(list(oof_ids), mode=mode)  # type: ignore[arg-type]
+
+
+async def tool_promote_blend_to_experiment(
+    *,
+    project_id: str,
+    parent_oof_ids: list[str],
+    weights: list[float],
+    pats: PatStore,
+    headers: dict[str, str] | None = None,
+    pat: str | None = None,
+    mode: str = "linear",
+    goal_id: str | None = None,
+    parent_experiment_ids: list[str] | None = None,
+    missions: MissionService | None = None,
+) -> dict[str, Any]:
+    """Thin MCP wrapper: stub promote with ensemble_blend lineage parents."""
+    _ = missions
+    auth = resolve_auth_context(headers=headers, explicit_token=pat, store=pats)
+    _require_project(auth, project_id)
+    from mymlfw.saas.ensemble import EnsembleError, promote_blend_to_experiment
+
+    try:
+        return promote_blend_to_experiment(
+            parent_oof_ids=parent_oof_ids,
+            weights=weights,
+            mode=mode,  # type: ignore[arg-type]
+            project_id=project_id,
+            goal_id=goal_id,
+            parent_experiment_ids=parent_experiment_ids,
+        )
+    except EnsembleError as exc:
+        return _err(exc.code, exc.message, suggested_fix=exc.extra.get("suggested_fix"))

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from mymlfw.api.deps import get_current_principal
@@ -12,7 +13,18 @@ from mymlfw.runner.client import RunnerClient, mint_job_token_stub
 from mymlfw.saas.artifacts import ArtifactError, OofArtifactService, default_memory_service
 from mymlfw.saas.ids import new_run_id, new_runner_id
 from mymlfw.saas.research import ResearchRunService
+from mymlfw.saas.ensemble import (
+    EnsembleError,
+    OofCandidate,
+    optimize_ensemble,
+    plan_ensemble,
+    promote_blend_to_experiment,
+)
 from mymlfw.saas.schemas import (
+    EnsembleOptimizeRequest,
+    EnsembleOptimizeResponse,
+    EnsemblePromoteRequest,
+    EnsemblePromoteResponse,
     ErrorSlicesResource,
     JobClaimRequest,
     JobClaimResponse,
@@ -169,6 +181,135 @@ async def get_error_slices(
     if svc is None:
         return ErrorSlicesResource(run_id=run_id, status="not_ready", slices=[])
     return svc.get_error_slices(run_id)
+
+
+@router.post(
+    "/projects/{project_id}/ensemble",
+    response_model=EnsembleOptimizeResponse,
+)
+async def optimize_project_ensemble(
+    project_id: str,
+    body: EnsembleOptimizeRequest,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> EnsembleOptimizeResponse:
+    """Nested-CV Caruana blend. Inline ``candidates`` for sandbox; else return plan."""
+    _ = _require_org(principal)
+    _ = project_id
+    if not body.candidates:
+        plan = plan_ensemble(list(body.oof_ids), mode=body.mode.value)
+        status = "plan" if plan.get("status") == "ready" else "error"
+        return EnsembleOptimizeResponse(
+            status=status,  # type: ignore[arg-type]
+            mode=body.mode,
+            requested_mode=body.mode,
+            oof_ids=list(body.oof_ids),
+            plan=plan,
+            error_code=plan.get("error_code"),
+            message=plan.get("suggested_fix") if status == "error" else None,
+            suggested_fix=plan.get("suggested_fix"),
+        )
+    if len(body.labels) == 0 or len(body.folds) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "missing_labels_folds",
+                "message": "Inline candidates require labels and folds.",
+            },
+        )
+    try:
+        cands = [
+            OofCandidate(
+                name=c.name,
+                predictions=np.asarray(c.predictions, dtype=np.float32),
+                oof_id=c.oof_id,
+                split_hash=c.split_hash,
+            )
+            for c in body.candidates
+        ]
+        result = optimize_ensemble(
+            cands,
+            y=np.asarray(body.labels),
+            folds=np.asarray(body.folds, dtype=int),
+            mode=body.mode.value,  # type: ignore[arg-type]
+            metric=body.metric,  # type: ignore[arg-type]
+            diversity_method=body.diversity_method,  # type: ignore[arg-type]
+            corr_threshold=body.corr_threshold,
+            polish=body.polish,
+            expected_split_hash=body.expected_split_hash,
+            allow_subsample=body.allow_subsample,
+        )
+    except EnsembleError as exc:
+        if exc.code == "needs_worker_offload":
+            return EnsembleOptimizeResponse(
+                status="needs_worker_offload",
+                mode=body.mode,
+                requested_mode=body.mode,
+                oof_ids=list(body.oof_ids),
+                offload_hint=exc.message,
+                ncm=exc.extra.get("ncm"),
+                error_code=exc.code,
+                message=exc.message,
+                suggested_fix=exc.extra.get("suggested_fix"),
+            )
+        raise HTTPException(status_code=400, detail=exc.to_dict()) from exc
+    payload = result.to_dict()
+    return EnsembleOptimizeResponse(
+        status="ok",
+        mode=payload["mode"],
+        requested_mode=payload.get("requested_mode"),
+        weights=payload["weights"],
+        candidate_names=payload["candidate_names"],
+        candidate_oof_ids=payload["candidate_oof_ids"],
+        nested_cv_score=payload["nested_cv_score"],
+        oof_blend_score=payload["oof_blend_score"],
+        fold_scores=payload["fold_scores"],
+        fold_snr=payload["fold_snr"],
+        p_value=payload["p_value"],
+        verdict=payload["verdict"],
+        ascii_board=payload["ascii_board"],
+        diversity_method=payload["diversity_method"],
+        metric=payload["metric"],
+        subsampled=payload["subsampled"],
+        offload_hint=payload.get("offload_hint"),
+        ncm=payload.get("ncm"),
+        oof_ids=list(body.oof_ids),
+    )
+
+
+@router.post(
+    "/projects/{project_id}/ensemble/promote",
+    response_model=EnsemblePromoteResponse,
+)
+async def promote_project_ensemble(
+    project_id: str,
+    body: EnsemblePromoteRequest,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> EnsemblePromoteResponse:
+    """Stub promote: writes ``ensemble_blend`` lineage parents (no MinIO yet)."""
+    _ = _require_org(principal)
+    try:
+        out = promote_blend_to_experiment(
+            parent_oof_ids=body.parent_oof_ids,
+            weights=body.weights,
+            mode=body.mode.value,  # type: ignore[arg-type]
+            project_id=project_id,
+            goal_id=body.goal_id,
+            parent_experiment_ids=body.parent_experiment_ids,
+            nested_cv_score=body.nested_cv_score,
+            fold_scores=body.fold_scores,
+        )
+    except EnsembleError as exc:
+        raise HTTPException(status_code=400, detail=exc.to_dict()) from exc
+    return EnsemblePromoteResponse(
+        status="stub",
+        experiment_id=out["experiment_id"],
+        strategy="ensemble_blend",
+        parent_oof_ids=out["parent_oof_ids"],
+        weights=out["weights"],
+        mode=body.mode,
+        detail=out["detail"],
+        experiment=out["experiment"],
+    )
 
 
 @router.post("/runners/heartbeat", response_model=RunnerHeartbeatResponse)

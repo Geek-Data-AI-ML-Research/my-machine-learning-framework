@@ -37,4 +37,5 @@ Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot
 | Notebook units (hypothesis+code+output) | `rag/notebook_chunker.py` |
 | Local BYOC runner | `mymlfw.runner` (`mymlfw runner start\|status`) |
 | Fair-share queue stub | `mymlfw.worker.fair_share` |
-| Ensemble / autopilot / cloud providers | `ensemble.py`, `autopilot.py`, `providers/` (**stubs** until pc-ensemble / pc-autopilot / pc-cloud-providers) |
+| Nested-CV ensemble (Caruana+SLSQP, ascii board) | `ensemble.py` |
+| Autopilot / cloud providers | `autopilot.py`, `providers/` (**stubs** until pc-autopilot / pc-cloud-providers) |

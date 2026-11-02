@@ -253,6 +253,546 @@
         "title": "DashboardResponse",
         "type": "object"
       },
+      "EnsembleCandidatePayload": {
+        "additionalProperties": false,
+        "description": "Inline OOF vector for sandbox optimize (float32 on the server).",
+        "properties": {
+          "name": {
+            "default": "model",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "oof_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oof Id"
+          },
+          "predictions": {
+            "items": {},
+            "title": "Predictions",
+            "type": "array"
+          },
+          "split_hash": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Hash"
+          }
+        },
+        "required": [
+          "predictions"
+        ],
+        "title": "EnsembleCandidatePayload",
+        "type": "object"
+      },
+      "EnsembleMode": {
+        "enum": [
+          "linear",
+          "rank",
+          "logit",
+          "geometric",
+          "auto"
+        ],
+        "title": "EnsembleMode",
+        "type": "string"
+      },
+      "EnsembleOptimizeRequest": {
+        "additionalProperties": false,
+        "description": "Optimize blend weights; prefer ``candidates`` inline until MinIO load lands.",
+        "properties": {
+          "allow_subsample": {
+            "default": true,
+            "title": "Allow Subsample",
+            "type": "boolean"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/EnsembleCandidatePayload"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "corr_threshold": {
+            "default": 0.99,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Corr Threshold",
+            "type": "number"
+          },
+          "diversity_method": {
+            "default": "spearman",
+            "enum": [
+              "spearman",
+              "pearson"
+            ],
+            "title": "Diversity Method",
+            "type": "string"
+          },
+          "expected_split_hash": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Split Hash"
+          },
+          "folds": {
+            "items": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "Folds",
+            "type": "array"
+          },
+          "labels": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "metric": {
+            "default": "auc",
+            "enum": [
+              "auc",
+              "log_loss",
+              "mse"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/EnsembleMode",
+            "default": "auto"
+          },
+          "oof_ids": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 4,
+              "type": "string"
+            },
+            "title": "Oof Ids",
+            "type": "array"
+          },
+          "polish": {
+            "default": true,
+            "title": "Polish",
+            "type": "boolean"
+          }
+        },
+        "title": "EnsembleOptimizeRequest",
+        "type": "object"
+      },
+      "EnsembleOptimizeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ascii_board": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ascii Board"
+          },
+          "candidate_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Candidate Names",
+            "type": "array"
+          },
+          "candidate_oof_ids": {
+            "items": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "minLength": 4,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Candidate Oof Ids",
+            "type": "array"
+          },
+          "diversity_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "spearman",
+                  "pearson"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversity Method"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "fold_scores": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Fold Scores",
+            "type": "array"
+          },
+          "fold_snr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fold Snr"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auc",
+                  "log_loss",
+                  "mse"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnsembleMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ncm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncm"
+          },
+          "nested_cv_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nested Cv Score"
+          },
+          "offload_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offload Hint"
+          },
+          "oof_blend_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oof Blend Score"
+          },
+          "oof_ids": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 4,
+              "type": "string"
+            },
+            "title": "Oof Ids",
+            "type": "array"
+          },
+          "p_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Value"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "requested_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnsembleMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "plan",
+              "error",
+              "needs_worker_offload"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subsampled": {
+            "default": false,
+            "title": "Subsampled",
+            "type": "boolean"
+          },
+          "suggested_fix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Fix"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          },
+          "weights": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "title": "EnsembleOptimizeResponse",
+        "type": "object"
+      },
+      "EnsemblePromoteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "fold_scores": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Fold Scores",
+            "type": "array"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/EnsembleMode",
+            "default": "linear"
+          },
+          "nested_cv_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nested Cv Score"
+          },
+          "parent_experiment_ids": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 4,
+              "type": "string"
+            },
+            "title": "Parent Experiment Ids",
+            "type": "array"
+          },
+          "parent_oof_ids": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 4,
+              "type": "string"
+            },
+            "minItems": 2,
+            "title": "Parent Oof Ids",
+            "type": "array"
+          },
+          "weights": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parent_oof_ids",
+          "weights"
+        ],
+        "title": "EnsemblePromoteRequest",
+        "type": "object"
+      },
+      "EnsemblePromoteResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "experiment": {
+            "additionalProperties": true,
+            "title": "Experiment",
+            "type": "object"
+          },
+          "experiment_id": {
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Experiment Id",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/EnsembleMode"
+          },
+          "parent_oof_ids": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 4,
+              "type": "string"
+            },
+            "title": "Parent Oof Ids",
+            "type": "array"
+          },
+          "status": {
+            "default": "stub",
+            "enum": [
+              "stub",
+              "created"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy": {
+            "const": "ensemble_blend",
+            "default": "ensemble_blend",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "weights": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "parent_oof_ids",
+          "weights",
+          "mode"
+        ],
+        "title": "EnsemblePromoteResponse",
+        "type": "object"
+      },
       "ErrorSliceItem": {
         "additionalProperties": false,
         "description": "Worst residual / hard-example slice after log_oof (MCP resource shape).",
@@ -2021,6 +2561,144 @@
         "summary": "Project Dashboard",
         "tags": [
           "brain"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/ensemble": {
+      "post": {
+        "description": "Nested-CV Caruana blend. Inline ``candidates`` for sandbox; else return plan.",
+        "operationId": "optimize_project_ensemble_v1_projects__project_id__ensemble_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnsembleOptimizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnsembleOptimizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Optimize Project Ensemble",
+        "tags": [
+          "phase-c"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/ensemble/promote": {
+      "post": {
+        "description": "Stub promote: writes ``ensemble_blend`` lineage parents (no MinIO yet).",
+        "operationId": "promote_project_ensemble_v1_projects__project_id__ensemble_promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnsemblePromoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnsemblePromoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Project Ensemble",
+        "tags": [
+          "phase-c"
         ]
       }
     },

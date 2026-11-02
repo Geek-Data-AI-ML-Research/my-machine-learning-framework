@@ -369,6 +369,11 @@ class ExperimentCreate(ApiModel):
         default_factory=list
     )
     teacher_oof_ids: list[PrefixedId] = Field(default_factory=list)
+    strategy: str | None = None
+    parent_oof_ids: list[PrefixedId] = Field(default_factory=list)
+    ensemble_weights: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(
+        default_factory=list
+    )
 
 
 class ExperimentResponse(ApiModel):
@@ -389,6 +394,11 @@ class ExperimentResponse(ApiModel):
     verdict: str | None = None
     status: ExperimentStatus = ExperimentStatus.open
     teacher_oof_ids: list[PrefixedId] = Field(default_factory=list)
+    strategy: str | None = None
+    parent_oof_ids: list[PrefixedId] = Field(default_factory=list)
+    ensemble_weights: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(
+        default_factory=list
+    )
 
 
 class DeadEndCreate(ApiModel):
@@ -697,3 +707,87 @@ class TrainStripEvent(ApiModel):
     progress_pct: Annotated[float, Field(ge=0, le=100, allow_inf_nan=False)] = 0.0
     fold: int | None = None
     message: str = ""
+
+
+# --- Phase C: nested-CV ensemble sandbox ------------------------------------
+
+
+class EnsembleMode(str, Enum):
+    linear = "linear"
+    rank = "rank"
+    logit = "logit"
+    geometric = "geometric"
+    auto = "auto"
+
+
+class EnsembleCandidatePayload(ApiModel):
+    """Inline OOF vector for sandbox optimize (float32 on the server)."""
+
+    name: Annotated[str, Field(min_length=1, max_length=128)] = "model"
+    oof_id: PrefixedId | None = None
+    split_hash: Annotated[str, Field(min_length=8, max_length=128)] | None = None
+    # Row-major predictions: length N (binary) or nested N×C.
+    predictions: list[Any]
+
+
+class EnsembleOptimizeRequest(ApiModel):
+    """Optimize blend weights; prefer ``candidates`` inline until MinIO load lands."""
+
+    oof_ids: list[PrefixedId] = Field(default_factory=list)
+    mode: EnsembleMode = EnsembleMode.auto
+    metric: Literal["auc", "log_loss", "mse"] = "auc"
+    diversity_method: Literal["spearman", "pearson"] = "spearman"
+    corr_threshold: Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)] = 0.99
+    polish: bool = True
+    allow_subsample: bool = True
+    labels: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=list)
+    folds: list[Annotated[int, Field(ge=0)]] = Field(default_factory=list)
+    candidates: list[EnsembleCandidatePayload] = Field(default_factory=list)
+    expected_split_hash: Annotated[str, Field(min_length=8, max_length=128)] | None = None
+
+
+class EnsembleOptimizeResponse(ApiModel):
+    status: Literal["ok", "plan", "error", "needs_worker_offload"] = "ok"
+    mode: EnsembleMode | None = None
+    requested_mode: EnsembleMode | None = None
+    weights: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=list)
+    candidate_names: list[str] = Field(default_factory=list)
+    candidate_oof_ids: list[PrefixedId | None] = Field(default_factory=list)
+    nested_cv_score: Annotated[float | None, Field(default=None, allow_inf_nan=False)] = None
+    oof_blend_score: Annotated[float | None, Field(default=None, allow_inf_nan=False)] = None
+    fold_scores: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=list)
+    fold_snr: Annotated[float | None, Field(default=None, allow_inf_nan=False)] = None
+    p_value: Annotated[float | None, Field(default=None, allow_inf_nan=False)] = None
+    verdict: str | None = None
+    ascii_board: str | None = None
+    diversity_method: Literal["spearman", "pearson"] | None = None
+    metric: Literal["auc", "log_loss", "mse"] | None = None
+    subsampled: bool = False
+    offload_hint: str | None = None
+    ncm: int | None = None
+    oof_ids: list[PrefixedId] = Field(default_factory=list)
+    error_code: str | None = None
+    message: str | None = None
+    suggested_fix: str | None = None
+    plan: dict[str, Any] | None = None
+
+
+class EnsemblePromoteRequest(ApiModel):
+    parent_oof_ids: list[PrefixedId] = Field(min_length=2)
+    weights: list[Annotated[float, Field(allow_inf_nan=False)]]
+    mode: EnsembleMode = EnsembleMode.linear
+    goal_id: PrefixedId | None = None
+    parent_experiment_ids: list[PrefixedId] = Field(default_factory=list)
+    nested_cv_score: Annotated[float | None, Field(default=None, allow_inf_nan=False)] = None
+    fold_scores: list[Annotated[float, Field(allow_inf_nan=False)]] = Field(default_factory=list)
+
+
+class EnsemblePromoteResponse(ApiModel):
+    status: Literal["stub", "created"] = "stub"
+    experiment_id: PrefixedId
+    strategy: Literal["ensemble_blend"] = "ensemble_blend"
+    parent_oof_ids: list[PrefixedId]
+    weights: list[Annotated[float, Field(allow_inf_nan=False)]]
+    mode: EnsembleMode
+    detail: str = ""
+    experiment: dict[str, Any] = Field(default_factory=dict)
