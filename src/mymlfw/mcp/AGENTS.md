@@ -6,9 +6,10 @@ Thin MCP tools/resources/prompts over saas services. One contract for Cursor, Cl
 
 - Keep handlers thin: call saas services only; no business logic in `mcp/`.
 - Mutating tools: send **Idempotency-Key**; require lease fencing token where specified.
-- B2 walking skeleton (later): PAT + `get_next_mission` / `complete_mission` / `get_project_dashboard`.
+- B2 walking skeleton: PAT + `get_next_mission` / `complete_mission` / `get_project_dashboard` (+ `list_projects` / `report_mission_progress`; stub `query_project_brain`).
 - Hash PATs at rest; never return secrets in tool responses.
 - Human-only elicitation confirm (E2) — never agent/PAT tokens.
+- Entry: `python -m mymlfw.mcp` / `mymlfw-mcp` (stdio or `--transport streamable-http`).
 
 ## DO NOT
 
