@@ -96,9 +96,10 @@ class DevAuthStore:
     def github_oauth_stub(self, code: str) -> TokenResponse:
         """Stub: exchange code for a deterministic dev user."""
         email = f"gh_{code[:12] or 'dev'}@users.noreply.github.com"
+        password = "gh-oauth-stub"
         if email not in self.by_email:
-            return self.register(email, f"gh-oauth-{code or 'dev'}", "GitHub Dev")
-        return self.login(email, f"gh-oauth-{code or 'dev'}")
+            return self.register(email, password, "GitHub Dev")
+        return self.login(email, password)
 
     def resolve(self, token: str) -> dict[str, Any] | None:
         user_id = self.sessions.get(token)
