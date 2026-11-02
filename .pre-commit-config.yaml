@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: saas-anti-drift
+        name: saas anti-drift AST / OpenAPI
+        entry: python scripts/check_saas_anti_drift.py
+        language: system
+        pass_filenames: false
+        types: [python]
