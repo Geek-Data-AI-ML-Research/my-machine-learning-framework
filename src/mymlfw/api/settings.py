@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     github_client_secret: str = ""
     github_oauth_stub: bool = True
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    minio_endpoint: str = "http://127.0.0.1:9000"
+    minio_bucket: str = "mymlfw"
+    minio_access_key: str = "mymlfw"
+    minio_secret_key: str = "mymlfwsecret"
+    minio_region: str = "us-east-1"
 
 
 def get_settings() -> Settings:

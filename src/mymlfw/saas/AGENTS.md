@@ -32,4 +32,9 @@ Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot
 | Mongo client / ScopedCollection / indexes | `saas/db/` |
 | API contracts | `saas/schemas.py`, `contracts/openapi.json` |
 | Project brain RAG | `saas/rag/` (+ its AGENTS.md) |
-| Ensemble / autopilot / provenance | `ensemble.py`, `autopilot.py`, `provenance.py` (later phases) |
+| OOF pending→confirm HEAD→ready | `artifacts.py`, `storage.py` |
+| Research modes / error_slices | `research.py` |
+| Notebook units (hypothesis+code+output) | `rag/notebook_chunker.py` |
+| Local BYOC runner | `mymlfw.runner` (`mymlfw runner start\|status`) |
+| Fair-share queue stub | `mymlfw.worker.fair_share` |
+| Ensemble / autopilot / cloud providers | `ensemble.py`, `autopilot.py`, `providers/` (**stubs** until pc-ensemble / pc-autopilot / pc-cloud-providers) |

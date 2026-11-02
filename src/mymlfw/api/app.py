@@ -17,6 +17,8 @@ from mymlfw.api.middleware import ClientVersionMiddleware
 from mymlfw.api.otel import setup_otel
 from mymlfw.api.public_route import public_route
 from mymlfw.api.routes_brain import router as brain_router
+from mymlfw.api.routes_phase_c import router as phase_c_router
+from mymlfw.api.routes_phase_c import sse_hello_and_train_strip
 from mymlfw.api.settings import Settings, get_settings
 from mymlfw.saas.schemas import (
     HealthResponse,
@@ -72,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(ClientVersionMiddleware, server_version=settings.api_version)
     app.add_middleware(IdempotencyMiddleware)
     app.include_router(brain_router)
+    app.include_router(phase_c_router)
 
     @app.get("/health", response_model=HealthResponse)
     @public_route
@@ -157,11 +160,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def events_stub(
         principal: dict[str, Any] = Depends(get_current_principal),
     ) -> StreamingResponse:
-        """SSE shell — Last-Event-ID multiplexing lands with live strips."""
+        """SSE shell + kit train_strip hook (Motion = Active State while running)."""
         _ = principal
 
         async def gen():
-            yield "id: 0\nevent: hello\ndata: {\"ok\":true}\n\n"
+            for chunk in sse_hello_and_train_strip():
+                yield chunk
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 

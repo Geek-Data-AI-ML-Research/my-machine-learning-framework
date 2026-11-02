@@ -260,6 +260,17 @@ def _parser() -> argparse.ArgumentParser:
         help="Bearer token (default MYMLFW_TOKEN)",
     )
 
+    runner = sub.add_parser("runner", exit_on_error=False)
+    runner_sub = runner.add_subparsers(dest="runner_cmd")
+    runner_start = runner_sub.add_parser("start", exit_on_error=False)
+    runner_start.add_argument(
+        "--once",
+        action="store_true",
+        help="Single heartbeat + claim then exit (stub).",
+    )
+    runner_start.add_argument("--poll-seconds", type=float, default=5.0)
+    runner_sub.add_parser("status", exit_on_error=False)
+
     return parser
 
 
@@ -627,6 +638,16 @@ def _dispatch(args) -> int:
                 note=str(exc.reason),
             ) from exc
         return 0
+    if args.command == "runner":
+        from mymlfw.runner.cli import print_json, runner_start, runner_status
+
+        if args.runner_cmd == "status":
+            print_json(runner_status())
+            return 0
+        if args.runner_cmd == "start":
+            print_json(runner_start(once=args.once, poll_seconds=args.poll_seconds))
+            return 0
+        raise MymlfwError("USAGE", "Use: mymlfw runner start|status")
     raise MymlfwError("UNKNOWN_COMMAND", "Run python -m mymlfw version.")
 
 
