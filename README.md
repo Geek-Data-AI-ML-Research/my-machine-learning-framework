@@ -110,11 +110,13 @@ Compose also mounts `~/.kaggle` read-only into the API container.
 
 Phase modules run from `tests/test_phase1_package.py` through `tests/test_phase16_analyze.py`. Retrieval wiring is `tests/test_rag_wiring.py`. SaaS anti-drift: `make anti-drift`.
 
-## Web page (marketing)
+## Marketing site (GitHub Pages)
 
-[site/index.html](site/index.html) is the GitHub Pages page. It loads [ascii.rest](https://ascii.rest/) 0.4.0 for the title and the typed command line. `.github/workflows/pages.yml` publishes the `site/` directory on every push to `main`.
+Static marketing site lives in [`site/`](site/) — what the framework does, the contest loop, Docker Studio, and agent entrypoints. Deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) from `site/` on pushes to `main`.
 
-In the repository settings, set Pages to **GitHub Actions**. After the first green deploy the address is `https://<owner>.github.io/<repo>/`.
+In the repository settings, set Pages to **GitHub Actions**. After the first green deploy:
+
+`https://geek-data-ai-ml-research.github.io/my-machine-learning-framework/`
 
 ## First CLI command
 

@@ -3,168 +3,268 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>mymlfw</title>
-    <meta name="description" content="Local toolkit for ML and Kaggle contests. One ledger, a submit gate, and memory for a coding agent.">
-    <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #f6f4f1;
-        --fg: #1c1917;
-        --muted: #57534e;
-        --line: #d6d3d1;
-        --code-bg: #fff;
-        --accent: #9a3412;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #1c1917;
-          --fg: #f5f5f4;
-          --muted: #a8a29e;
-          --line: #44403c;
-          --code-bg: #292524;
-          --accent: #fdba74;
-        }
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-        font-size: 15px;
-        line-height: 1.55;
-      }
-      a { color: var(--accent); }
-      a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-      main {
-        width: min(720px, calc(100% - 32px));
-        margin: 40px auto 72px;
-      }
-      ascii-banner.title {
-        display: block;
-        width: min(100%, 640px);
-        margin: 0 0 12px;
-      }
-      ascii-art.lead {
-        display: block;
-        font-size: 14px;
-        line-height: 1.35;
-        min-height: 1.35em;
-        margin: 0 0 28px;
-      }
-      ascii-banner.section {
-        display: block;
-        font-size: 13px;
-        line-height: 1.1;
-        color: var(--accent);
-        margin: 36px 0 10px;
-      }
-      p, li { color: var(--fg); }
-      .muted { color: var(--muted); }
-      main > pre {
-        margin: 0 0 16px;
-        padding: 12px 14px;
-        overflow-x: auto;
-        background: var(--code-bg);
-        border: 1px solid var(--line);
-      }
-      code { font-family: inherit; }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 0 0 16px;
-      }
-      th, td {
-        text-align: left;
-        vertical-align: top;
-        padding: 8px 10px 8px 0;
-        border-bottom: 1px solid var(--line);
-      }
-      th { color: var(--muted); font-weight: 500; }
-      footer {
-        margin-top: 40px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-    </style>
+    <title>mymlfw — contest toolkit for ML agents</title>
+    <meta
+      name="description"
+      content="mymlfw is a local toolkit for ML and Kaggle contests: one experiment ledger, blend and submit gates, agent memory, and an optional Campaign SaaS Studio with MCP."
+    >
+    <meta name="theme-color" content="#eef3f0">
+    <link rel="canonical" href="https://geek-data-ai-ml-research.github.io/my-machine-learning-framework/">
+    <meta property="og:title" content="mymlfw — contest toolkit for ML agents">
+    <meta
+      property="og:description"
+      content="One ledger. Guarded blends. Agent memory of what already failed. Optional Studio + MCP for campaign sync."
+    >
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="site.css">
   </head>
   <body>
-    <script
-      type="module"
-      src="https://cdn.jsdelivr.net/npm/ascii.rest@0.4.0/dist/ascii.js"
-      integrity="sha384-SBNELtJu9hcp9Nd2BljjmOuQ4VUromhUiD1ENpl5swn1R1vJCH7/qR3BsQmmOJZA"
-      crossorigin="anonymous"
-    ></script>
-    <main>
-      <ascii-banner
-        class="title"
-        text="mymlfw"
-        font="block"
-        shadow="rounded"
-        label="mymlfw"
-        options='{"color":{"light":"#9a3412","dark":"#fdba74"}}'
-      >mymlfw</ascii-banner>
-      <ascii-art
-        class="lead"
-        piece="typewriter"
-        label="python -m mymlfw"
-        options='{"prefix":"$ python -m mymlfw ","phrases":["version","new-contest demo --dest .","advise --dir .","analyze --dir ."]}'
-      >$ python -m mymlfw version</ascii-art>
+    <a class="skip" href="#main">Skip to content</a>
 
-      <p>Version 0.1.0. A local toolkit for ML and Kaggle contests. It keeps one experiment ledger, checks blends and submissions, and gives a coding agent a memory of what already failed.</p>
-      <p class="muted">Python 3.11 or newer. One user. No account, no model host, and no call to Kaggle or a cloud provider.</p>
+    <header class="top">
+      <div class="wrap top-inner">
+        <a class="brand-mark" href="#top">mymlfw</a>
+        <nav class="top-links" aria-label="Primary">
+          <a href="#what">What it does</a>
+          <a href="#loop">Loop</a>
+          <a href="#saas">Studio</a>
+          <a href="#start">Start</a>
+          <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework">GitHub</a>
+        </nav>
+      </div>
+    </header>
 
-      <ascii-banner class="section" text="install" font="slim" shadow="none" pixel="1" label="install">install</ascii-banner>
-      <pre><code>pip install -e .
-python -m mymlfw version</code></pre>
-      <p>The core install covers the ledger, GroupKFold, blends, the submit gate, the kernel builder, five engines, cloud script rendering, and retrieval. A real backward pass needs <code>pip install -e '.[train]'</code>.</p>
+    <main id="main">
+      <section class="hero" id="top" aria-label="Introduction">
+        <div class="hero-plane" aria-hidden="true">
+          <!-- Product visual: ledger rows + fold strip as atmospheric plane -->
+          <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" role="presentation">
+            <defs>
+              <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.72"/>
+                <stop offset="100%" stop-color="#c5ddd4" stop-opacity="0.55"/>
+              </linearGradient>
+            </defs>
+            <g transform="translate(620 170)">
+              <rect x="0" y="0" width="520" height="520" rx="18" fill="url(#panel)" stroke="#14201c" stroke-opacity="0.14"/>
+              <text x="28" y="42" font-family="IBM Plex Mono, monospace" font-size="14" fill="#5c6f67">ledger / experiments.csv</text>
+              <g font-family="IBM Plex Mono, monospace" font-size="13" fill="#14201c">
+                <text x="28" y="92">exp_id</text>
+                <text x="160" y="92" fill="#5c6f67">variable</text>
+                <text x="340" y="92" fill="#5c6f67">cv</text>
+                <text x="420" y="92" fill="#5c6f67">verdict</text>
+                <line x1="28" y1="108" x2="492" y2="108" stroke="#14201c" stroke-opacity="0.12"/>
+                <text x="28" y="138">exp_001</text>
+                <text x="160" y="138">lora_r=16</text>
+                <text x="340" y="138">0.742</text>
+                <text x="420" y="138" fill="#0f766e">keep</text>
+                <text x="28" y="178">exp_002</text>
+                <text x="160" y="178">depth=8</text>
+                <text x="340" y="178">0.711</text>
+                <text x="420" y="178" fill="#9a3412">kill</text>
+                <text x="28" y="218">exp_003</text>
+                <text x="160" y="218">blend_w</text>
+                <text x="340" y="218">0.749</text>
+                <text x="420" y="218" fill="#5c6f67">pending</text>
+              </g>
+              <g transform="translate(28 270)">
+                <text x="0" y="0" font-family="IBM Plex Mono, monospace" font-size="12" fill="#5c6f67">OOF folds · GroupKFold</text>
+                <rect x="0" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.85"/>
+                <rect x="84" y="18" width="72" height="28" rx="4" fill="#14b8a6" opacity="0.55"/>
+                <rect x="168" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.7"/>
+                <rect x="252" y="18" width="72" height="28" rx="4" fill="#14b8a6" opacity="0.4"/>
+                <rect x="336" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.6"/>
+              </g>
+              <g transform="translate(28 360)" font-family="IBM Plex Mono, monospace" font-size="12">
+                <text fill="#5c6f67">preflight</text>
+                <text x="0" y="28" fill="#0f766e">✓ artifact sha</text>
+                <text x="0" y="52" fill="#0f766e">✓ probe open</text>
+                <text x="0" y="76" fill="#0f766e">✓ kernel offline</text>
+              </g>
+            </g>
+          </svg>
+        </div>
 
-      <ascii-banner class="section" text="first contest" font="slim" shadow="none" pixel="1" label="first contest">first contest</ascii-banner>
-      <pre><code>python -m mymlfw new-contest demo --dest .
-python -m mymlfw probe register \
-  --ledger demo/ledger/experiments.csv \
-  --experiment-id exp_001 \
-  --baseline-id base \
-  --variable lora_r=16 \
-  --band-low 0.70 \
-  --band-high 0.80
-python -m mymlfw analyze --dir demo</code></pre>
-      <p><code>analyze</code> prints JSON and writes nothing unless you pass <code>--out</code>. <code>next_steps</code> holds at most five items.</p>
+        <div class="wrap">
+          <div class="hero-copy">
+            <p class="hero-brand">mymlfw</p>
+            <h1 class="hero-title">Run contests with a memory of what already failed</h1>
+            <p class="hero-lede">
+              Local toolkit for ML and Kaggle campaigns — one ledger, guarded blends, and advice a coding agent can trust.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework">View on GitHub</a>
+              <a class="btn btn-ghost" href="#start">Get started</a>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <ascii-banner class="section" text="what it does" font="slim" shadow="none" pixel="1" label="what it does">what it does</ascii-banner>
-      <table>
-        <thead>
-          <tr><th>Command</th><th>Result</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>probe register</code></td><td>One variable and a public-score band in the ledger.</td></tr>
-          <tr><td><code>blend optimize</code></td><td>Weights for out-of-fold prediction bundles.</td></tr>
-          <tr><td><code>preflight</code></td><td>Refuses a closed probe, a hash mismatch, or a kernel with internet on.</td></tr>
-          <tr><td><code>advise --dir</code></td><td>A git worktree and <code>docs/MYMLFW_ADVICE.md</code>. Needs a commit and a clean tracked tree.</td></tr>
-          <tr><td><code>episode add</code></td><td>The lesson the agent records after the run. Advise does not write it.</td></tr>
-        </tbody>
-      </table>
+      <section class="section" id="what">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="section-kicker">What it does</p>
+            <h2 class="section-title">Keep the campaign honest</h2>
+            <p class="section-lede">
+              mymlfw is the process boundary around a contest: register probes, blend OOFs, refuse bad submissions, and brief the next agent turn.
+            </p>
+          </header>
+          <ul class="pillars reveal">
+            <li>
+              <h3>One experiment ledger</h3>
+              <p>Every probe names one variable and a score band. Duplicates and closed probes are refused before you waste a run.</p>
+            </li>
+            <li>
+              <h3>Blend and submit gates</h3>
+              <p>Align predictions, optimize weights, then preflight hashes, leak checks, and offline kernels before anything leaves the machine.</p>
+            </li>
+            <li>
+              <h3>Agent memory</h3>
+              <p>Recipes, dead ends, and episodes stay retrievable. Advise writes a worktree brief; the agent records the outcome later.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-      <ascii-banner class="section" text="engines" font="slim" shadow="none" pixel="1" label="engines">engines</ascii-banner>
-      <table>
-        <thead>
-          <tr><th>Recipe</th><th>Class</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>closed-set-llm-id, grouped-text</td><td><code>TextBlendEngine</code></td></tr>
-          <tr><td>ranking</td><td><code>RankedCandidateEngine</code></td></tr>
-          <tr><td>code-agent</td><td><code>AgentZipEngine</code></td></tr>
-          <tr><td>circuit-portfolio</td><td><code>PortfolioEngine</code></td></tr>
-          <tr><td>benchmark</td><td><code>BenchmarkEngine</code></td></tr>
-        </tbody>
-      </table>
+      <section class="section" id="loop">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="section-kicker">The loop</p>
+            <h2 class="section-title">From probe to next step</h2>
+            <p class="section-lede">
+              A single CLI process. Failures are one JSON object on stderr with an error code and a suggested fix.
+            </p>
+          </header>
+          <ol class="loop reveal">
+            <li>
+              <h3>Probe</h3>
+              <p>Register the change, update CV, score public, set a verdict. The ledger is the source of truth.</p>
+            </li>
+            <li>
+              <h3>Blend</h3>
+              <p>Optimize OOF weights, check diversity and shift, diagnose folds before you promote a stack.</p>
+            </li>
+            <li>
+              <h3>Gate</h3>
+              <p>Preflight blocks closed probes, hash mismatches, and kernels with internet on.</p>
+            </li>
+            <li>
+              <h3>Advise</h3>
+              <p>Retrieve recipes and past lessons into a git worktree brief. Record the episode after you run.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
 
-      <ascii-banner class="section" text="for an agent" font="slim" shadow="none" pixel="1" label="for an agent">for an agent</ascii-banner>
-      <p>Read <code>llms.txt</code> in the checkout, then <code>AGENTS.md</code>. Failures are one JSON object on stderr with <code>error_code</code> and <code>suggested_fix</code>. Call <code>mymlfw.cv.run_oof</code> for grouped folds.</p>
+      <section class="band" id="saas">
+        <div class="wrap reveal">
+          <p class="section-kicker">Campaign SaaS</p>
+          <h2 class="section-title">Studio when the campaign outgrows a single folder</h2>
+          <p class="section-lede">
+            Optional Docker stack: API, Studio console, MCP for agents, Mongo, Redis, and object storage — all bound to localhost until you connect cloud runners.
+          </p>
+          <div class="cta-row band-actions">
+            <a class="btn btn-primary" href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework#campaign-saas--docker-setup">Docker setup</a>
+            <a class="btn btn-ghost" href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework/blob/main/docs/how-to/agent-mcp-campaign-sync.md">Agent MCP sync</a>
+          </div>
+        </div>
+      </section>
 
-      <footer>
-        <p>Published with GitHub Pages from <code>site/index.html</code>. Letters and the typed line are <a href="https://ascii.rest/">ascii.rest</a> 0.4.0.</p>
-      </footer>
+      <section class="section" id="start">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="section-kicker">Start</p>
+            <h2 class="section-title">Install and scaffold a contest</h2>
+            <p class="section-lede">Python 3.11+. Local by default — no account required for the core toolkit.</p>
+          </header>
+          <div class="start-grid reveal">
+            <div>
+              <p>
+                Clone the repo, install the package, then create a contest directory with an empty ledger and preflight script.
+              </p>
+              <p class="start-note">
+                Full walkthrough:
+                <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework/blob/main/docs/tutorials/first-contest.md">First contest</a>
+                ·
+                <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework/blob/main/docs/index.md">Docs index</a>
+              </p>
+            </div>
+            <pre><code>git clone https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework.git
+cd my-machine-learning-framework
+python -m venv .venv
+.venv/bin/pip install -e .
+.venv/bin/python -m mymlfw version
+.venv/bin/python -m mymlfw new-contest demo --dest .</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="agents">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="section-kicker">For coding agents</p>
+            <h2 class="section-title">Built to be driven by an IDE agent</h2>
+            <p class="section-lede">Read the machine index first, then the binding rules — not a wall of markdown.</p>
+          </header>
+          <ul class="agent-list reveal">
+            <li>
+              <strong>llms.txt + AGENTS.md</strong>
+              <span>Command map and non-negotiable rules (call <code class="inline-code">run_oof</code>, don’t invent folds).</span>
+            </li>
+            <li>
+              <strong>JSON failures</strong>
+              <span>Every CLI error is one object with <code class="inline-code">error_code</code> and <code class="inline-code">suggested_fix</code>.</span>
+            </li>
+            <li>
+              <strong>Five engines</strong>
+              <span>TextBlend, RankedCandidate, AgentZip, Portfolio, Benchmark — matched from recipe cards.</span>
+            </li>
+            <li>
+              <strong>MCP Studio sync</strong>
+              <span>Keep roadmap, dead ends, and levers updated from the agent without pasting screenshots.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
     </main>
+
+    <footer class="foot">
+      <div class="wrap foot-inner">
+        <p>mymlfw 0.1.0 · open source contest toolkit</p>
+        <p>
+          <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework">Repository</a>
+          <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework/blob/main/docs/index.md">Documentation</a>
+          <a href="https://github.com/Geek-Data-AI-ML-Research/my-machine-learning-framework/blob/main/llms.txt">llms.txt</a>
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        var nodes = document.querySelectorAll(".reveal");
+        if (!nodes.length || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          nodes.forEach(function (n) { n.classList.add("is-in"); });
+          return;
+        }
+        var io = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) {
+                e.target.classList.add("is-in");
+                io.unobserve(e.target);
+              }
+            });
+          },
+          { rootMargin: "0px 0px -8% 0px", threshold: 0.12 }
+        );
+        nodes.forEach(function (n) { io.observe(n); });
+      })();
+    </script>
   </body>
 </html>

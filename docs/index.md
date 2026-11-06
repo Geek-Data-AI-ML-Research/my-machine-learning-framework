@@ -9,7 +9,7 @@ Version 0.1.0. These pages follow the [Diátaxis](https://diataxis.fr/) split: a
 | Checking a flag, column, or path | [Reference](#reference) |
 | Deciding whether a change belongs in this package | [Explanation](#explanation) |
 | A coding agent | [`llms.txt`](../llms.txt) and [`AGENTS.md`](../AGENTS.md) |
-| The published page | [`site/index.html`](../site/index.html), deployed by GitHub Pages |
+| The published marketing site | [`site/index.html`](../site/index.html) → GitHub Pages |
 
 Install with `pip install -e .` from the repository root. Python 3.11 or newer. The command is `python -m mymlfw`. A failure is one JSON object on stderr.
 
