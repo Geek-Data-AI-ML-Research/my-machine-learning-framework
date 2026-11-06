@@ -12,11 +12,6 @@ from ulid import ULID
 
 from mymlfw.saas.schemas import PatCreateResponse, PatPrincipal
 
-try:
-    from pymongo.asynchronous.database import AsyncDatabase
-except ImportError:  # pragma: no cover
-    AsyncDatabase = Any  # type: ignore[misc, assignment]
-
 
 def hash_pat(token: str) -> bytes:
     """Canonical at-rest form: SHA-256 digest as bytes (never store plaintext)."""
@@ -56,7 +51,8 @@ class StoredPat:
 class PatStore:
     """PAT registry: in-memory for tests; Mongo ``agent_pats`` when ``mongo_db`` set."""
 
-    def __init__(self, mongo_db: AsyncDatabase | None = None) -> None:
+    def __init__(self, mongo_db: Any | None = None) -> None:
+        """Optional Mongo handle from ``saas.db`` / runtime wiring (not typed here)."""
         self._mongo = mongo_db
         self._by_hash: dict[bytes, StoredPat] = {}
         self._by_id: dict[str, StoredPat] = {}
