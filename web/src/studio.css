@@ -1,0 +1,286 @@
+@import "charts.css/dist/charts.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply min-h-full bg-ink-950 text-mist-200 antialiased;
+  }
+
+  body {
+    @apply font-sans;
+  }
+
+  #app {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .studio-shell {
+    @apply mx-auto max-w-studio px-4 pb-16 pt-0 sm:px-6;
+  }
+
+  .studio-topbar {
+    @apply sticky top-0 z-30 -mx-4 mb-6 flex flex-wrap items-center gap-3 border-b border-ink-700 bg-ink-950/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6;
+  }
+
+  .studio-brand {
+    @apply text-sm font-semibold tracking-[0.14em] text-signal;
+  }
+
+  .studio-cta {
+    @apply inline-flex items-center justify-center rounded-md bg-signal px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-mist-300 focus:outline-none focus:ring-2 focus:ring-signal/20;
+  }
+
+  .studio-ghost {
+    @apply inline-flex items-center justify-center rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm text-mist-200 transition hover:border-mist-500 hover:text-signal;
+  }
+
+  .studio-link {
+    @apply text-sm text-mist-400 underline-offset-4 hover:text-signal hover:underline;
+  }
+
+  .studio-tab {
+    @apply rounded-md px-3 py-1.5 text-sm text-mist-400 transition hover:bg-ink-800 hover:text-signal;
+  }
+
+  .studio-tab-on {
+    @apply bg-ink-800 text-signal;
+  }
+
+  .studio-card {
+    @apply rounded-xl border border-ink-700 bg-ink-900 p-4 shadow-card;
+  }
+
+  .studio-stat {
+    @apply flex flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900 p-4 shadow-card;
+  }
+
+  .studio-stat span {
+    @apply text-xs uppercase tracking-[0.12em] text-mist-500;
+  }
+
+  .studio-stat strong {
+    @apply text-2xl font-semibold tracking-tight text-signal;
+  }
+
+  .studio-stat em {
+    @apply text-xs not-italic text-mist-500;
+  }
+
+  .studio-input {
+    @apply mt-1 w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-signal placeholder:text-mist-500 focus:border-mist-400 focus:outline-none focus:ring-1 focus:ring-mist-400;
+  }
+
+  .studio-label {
+    @apply mt-3 block text-xs uppercase tracking-[0.12em] text-mist-500;
+  }
+
+  .studio-err {
+    @apply mt-3 text-sm text-signal-bad;
+  }
+
+  .studio-note {
+    @apply mb-3 rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-mist-300;
+  }
+
+  /* Charts.css — light Studio */
+  .charts-css {
+    --charts-color: #18181b;
+    height: 10rem;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .charts-css.bar {
+    --primary-axis: #e4e4e7;
+    height: auto;
+  }
+
+  .charts-css.bar tbody tr {
+    height: 1.75rem;
+  }
+
+  .charts-css.bar td {
+    background: #18181b;
+  }
+
+  .charts-css th {
+    color: #52525b;
+    font-weight: 500;
+  }
+
+  .charts-css.column {
+    --primary-axis: #e4e4e7;
+  }
+
+  .charts-css.column td {
+    background: linear-gradient(180deg, #3f3f46 0%, #18181b 100%);
+  }
+
+  /* Legacy class bridges while remaining modes migrate */
+  .page {
+    @apply space-y-4;
+  }
+
+  .page-head {
+    @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+  }
+
+  .page-head h1,
+  .page h1 {
+    @apply text-3xl font-semibold tracking-tight text-signal;
+  }
+
+  .lede {
+    @apply mt-1 text-sm text-mist-400;
+  }
+
+  .sub {
+    @apply text-xs text-mist-500;
+  }
+
+  .cta {
+    @apply inline-flex items-center justify-center rounded-md bg-signal px-4 py-2 text-sm font-medium text-ink-950 transition hover:bg-mist-300;
+  }
+
+  .ghost {
+    @apply inline-flex items-center justify-center rounded-md border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm text-mist-200 transition hover:border-mist-500 hover:text-signal;
+  }
+
+  .linkish {
+    @apply text-sm text-mist-400 underline-offset-4 hover:text-signal hover:underline;
+  }
+
+  .card {
+    @apply rounded-xl border border-ink-700 bg-ink-900 p-4 shadow-card;
+  }
+
+  .grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .stats {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .stat {
+    @apply flex flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900 p-4 shadow-card;
+  }
+
+  .stat span {
+    @apply text-xs uppercase tracking-[0.12em] text-mist-500;
+  }
+
+  .stat strong {
+    @apply text-2xl font-semibold tracking-tight text-signal;
+  }
+
+  .stat em {
+    @apply text-xs not-italic text-mist-500;
+  }
+
+  .tabs {
+    @apply mb-6 flex flex-wrap gap-1 border-b border-ink-700 pb-3;
+  }
+
+  .tab {
+    @apply rounded-md px-3 py-1.5 text-sm text-mist-400 transition hover:bg-ink-800 hover:text-signal;
+  }
+
+  .tab.on {
+    @apply bg-ink-800 text-signal;
+  }
+
+  .pill {
+    @apply rounded-full border border-ink-600 bg-ink-900 px-2 py-0.5 text-xs tracking-wide text-signal;
+  }
+
+  .err {
+    @apply mt-3 text-sm text-signal-bad;
+  }
+
+  .note {
+    @apply mb-3 rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-mist-300;
+  }
+
+  .board,
+  .board.mini,
+  pre.board {
+    @apply overflow-x-auto rounded-lg border border-ink-700 bg-ink-800 p-3 font-mono text-xs text-mist-300;
+  }
+
+  .palette {
+    @apply fixed left-1/2 top-24 z-50 w-[min(28rem,92vw)] -translate-x-1/2 rounded-xl border border-ink-600 bg-ink-900 p-3 shadow-card;
+  }
+
+  .palette input {
+    @apply mt-1 w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-signal;
+  }
+
+  .palette-list {
+    @apply mt-2 max-h-64 space-y-1 overflow-auto text-sm;
+  }
+
+  .palette-list li {
+    @apply cursor-pointer rounded-md px-2 py-1.5 hover:bg-ink-800;
+  }
+
+  table:not(.charts-css) {
+    @apply w-full text-left text-sm;
+  }
+
+  table:not(.charts-css) th {
+    @apply px-2 py-2 text-xs uppercase tracking-[0.08em] text-mist-500;
+  }
+
+  table:not(.charts-css) td {
+    @apply px-2 py-2 align-top;
+  }
+
+  .plain {
+    @apply list-disc space-y-1 pl-4 text-sm text-mist-300;
+  }
+
+  .sec-actions {
+    @apply flex flex-wrap gap-4;
+  }
+
+  .wizard label,
+  .dialog-form label {
+    @apply mt-3 block text-xs uppercase tracking-[0.12em] text-mist-500;
+  }
+
+  .wizard input,
+  .wizard select,
+  .wizard textarea,
+  .dialog-form input,
+  .dialog-form textarea {
+    @apply mt-1 w-full rounded-md border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-signal;
+  }
+}

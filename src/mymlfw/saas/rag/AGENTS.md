@@ -21,4 +21,4 @@ Project Brain adaptive DSS (contrastive cards, `$rankFusion`, rescoring, lever v
 
 ## Phase note
 
-Wave 1 ships package + AGENTS only. Full DSS lands in Phase E; stubs may exist earlier.
+Phase E DSS is live: contrastive cards, query expand + Tier2 cold-start, app-side RRF, 3-bucket rescore, citation firewall, utility bandit, consolidate axioms, integrity gate. RAG quality evals (Recall@3 / tenant leak) land in Phase F. `lever_verifier` LLM judge / propose_lever MCP harden in E2.

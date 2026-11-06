@@ -1,6 +1,6 @@
 # Architecture
 
-Explanation of why mymlfw is split the way it is. Version 0.1.0. It is a local, single-user package. It is not a training service and it does not call Kaggle, AWS, or RunPod.
+Explanation of why mymlfw is split the way it is. Version 0.1.0. The core package is local and single-user: it does not call Kaggle, AWS, or RunPod unless you opt into Campaign SaaS providers (see [Campaign SaaS cloud](campaign-saas-cloud.md)).
 
 ## Layers
 

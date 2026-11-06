@@ -12,6 +12,11 @@ from ulid import ULID
 
 from mymlfw.saas.schemas import PatCreateResponse, PatPrincipal
 
+try:
+    from pymongo.asynchronous.database import AsyncDatabase
+except ImportError:  # pragma: no cover
+    AsyncDatabase = Any  # type: ignore[misc, assignment]
+
 
 def hash_pat(token: str) -> bytes:
     """Canonical at-rest form: SHA-256 digest as bytes (never store plaintext)."""
@@ -22,13 +27,17 @@ def new_token_id() -> str:
     return f"tok_{ULID()}"
 
 
-def _mint_plaintext(*, token_id: str) -> tuple[str, str]:
+def mint_plaintext(*, token_id: str) -> tuple[str, str]:
     """Return ``(plaintext, prefix)``. Prefix is safe to display in tables."""
     secret = secrets.token_urlsafe(24)
     # Prefix omits the secret; full token is shown once on create.
     prefix = f"mlp_{token_id.removeprefix('tok_')[:10]}"
     plaintext = f"{prefix}.{secret}"
     return plaintext, prefix
+
+
+# Back-compat alias for earlier private name.
+_mint_plaintext = mint_plaintext
 
 
 @dataclass(frozen=True)
@@ -45,9 +54,10 @@ class StoredPat:
 
 
 class PatStore:
-    """In-memory PAT registry for B2; Mongo ``agent_connections`` lands with E2."""
+    """PAT registry: in-memory for tests; Mongo ``agent_pats`` when ``mongo_db`` set."""
 
-    def __init__(self) -> None:
+    def __init__(self, mongo_db: AsyncDatabase | None = None) -> None:
+        self._mongo = mongo_db
         self._by_hash: dict[bytes, StoredPat] = {}
         self._by_id: dict[str, StoredPat] = {}
 
@@ -60,7 +70,7 @@ class PatStore:
         label: str = "mcp-worker",
     ) -> PatCreateResponse:
         token_id = new_token_id()
-        plaintext, prefix = _mint_plaintext(token_id=token_id)
+        plaintext, prefix = mint_plaintext(token_id=token_id)
         digest = hash_pat(plaintext)
         now = datetime.now(UTC)
         scope_tuple = tuple(scopes or ["mcp:worker"])
@@ -85,6 +95,57 @@ class PatStore:
             scopes=list(scope_tuple),
         )
 
+    async def acreate(
+        self,
+        *,
+        workspace_id: str,
+        project_id: str | None = None,
+        scopes: list[str] | None = None,
+        label: str = "mcp-worker",
+        replace: bool = False,
+    ) -> PatCreateResponse:
+        if self._mongo is not None:
+            from mymlfw.saas.db import pat_data
+
+            return await pat_data.create_pat(
+                self._mongo,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                scopes=scopes,
+                label=label,
+                replace=replace,
+            )
+        if replace:
+            # In-memory: revoke all active for this workspace first.
+            for stored in list(self._by_id.values()):
+                if (
+                    stored.workspace_id == workspace_id
+                    and stored.revoked_at is None
+                ):
+                    self.revoke(stored.token_id)
+        else:
+            for stored in self._by_id.values():
+                if (
+                    stored.workspace_id == workspace_id
+                    and stored.revoked_at is None
+                ):
+                    from mymlfw.saas.db.pat_data import PatExistsError
+
+                    raise PatExistsError(
+                        active=[
+                            {
+                                "token_id": stored.token_id,
+                                "token_prefix": stored.token_prefix,
+                            }
+                        ]
+                    )
+        return self.create(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            scopes=scopes,
+            label=label,
+        )
+
     def verify(self, token: str) -> PatPrincipal | None:
         if not token:
             return None
@@ -99,6 +160,15 @@ class PatStore:
             scopes=list(stored.scopes),
             label=stored.label,
         )
+
+    async def averify(self, token: str) -> PatPrincipal | None:
+        if self._mongo is not None:
+            from mymlfw.saas.db import pat_data
+
+            principal = await pat_data.verify_pat(self._mongo, token)
+            if principal is not None:
+                return principal
+        return self.verify(token)
 
     def revoke(self, token_id: str) -> bool:
         stored = self._by_id.get(token_id)

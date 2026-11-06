@@ -2,13 +2,29 @@
   "name": "mymlfw-web",
   "private": true,
   "version": "0.1.0",
-  "description": "Campaign SaaS console (ascii.rest). Wave 1 ships a monospace shell in public/.",
+  "description": "Campaign SaaS Studio console — Tailwind CSS + Charts.css (see web/AGENTS.md).",
   "scripts": {
-    "dev": "python3 -m http.server 5173 --directory public",
-    "note": "echo 'Install ascii skill: npx skills add bas3line/ascii; pin ascii.rest ^0.4'"
+    "dev": "python3 -m http.server 5174 --bind 127.0.0.1 --directory public",
+    "build:css": "tailwindcss -i ./src/studio.css -o ./public/vendor/studio.css --minify",
+    "watch:css": "tailwindcss -i ./src/studio.css -o ./public/vendor/studio.css --watch",
+    "build": "npm run build:css",
+    "note": "echo 'Studio stack: Tailwind CSS + Charts.css'"
   },
   "comments": {
-    "ascii": "npx skills add bas3line/ascii",
-    "dependency": "ascii.rest >=0.4 (Phase B+)"
+    "ui": "Tailwind CSS + https://github.com/ChartsCSS/charts.css"
+  },
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ascii.rest": "^0.4.0",
+    "charts.css": "^1.2.0",
+    "esbuild": "^0.28.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.6.2",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^3.4.19"
   }
 }

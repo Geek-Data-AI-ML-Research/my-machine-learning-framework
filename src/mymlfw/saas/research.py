@@ -1,4 +1,4 @@
-"""Research run modes (``fold0_smoke`` | ``full_cv``) + error_slices resource stub."""
+"""Research run modes (``fold0_smoke`` | ``full_cv``) and error-slice resources."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ class ResearchRunService:
         # Empty resource until log_oof fills slices.
         self.error_slices[run_id] = ErrorSlicesResource(
             run_id=run_id,
-            status="not_ready",
+            status="empty",
             slices=[],
             generated_at=None,
         )
@@ -65,17 +65,17 @@ class ResearchRunService:
     def get_error_slices(self, run_id: str) -> ErrorSlicesResource:
         resource = self.error_slices.get(run_id)
         if resource is None:
-            return ErrorSlicesResource(run_id=run_id, status="not_ready", slices=[])
+            return ErrorSlicesResource(run_id=run_id, status="empty", slices=[])
         return resource
 
-    def set_error_slices_stub(
+    def set_error_slices(
         self,
         run_id: str,
         *,
         oof_id: str | None,
         slices: list[ErrorSliceItem],
     ) -> ErrorSlicesResource:
-        """Test / log_oof hook — real residual math lands with metrics wiring."""
+        """Store residual slices for a run. Empty input stays status ``empty``."""
         if run_id not in self.runs:
             raise KeyError("run_not_found")
         resource = ErrorSlicesResource(
@@ -87,6 +87,15 @@ class ResearchRunService:
         )
         self.error_slices[run_id] = resource
         return resource
+
+    def set_error_slices_stub(
+        self,
+        run_id: str,
+        *,
+        oof_id: str | None,
+        slices: list[ErrorSliceItem],
+    ) -> ErrorSlicesResource:
+        return self.set_error_slices(run_id, oof_id=oof_id, slices=slices)
 
 
 def suggested_next_mode(current: ResearchRunMode) -> ResearchRunMode | None:

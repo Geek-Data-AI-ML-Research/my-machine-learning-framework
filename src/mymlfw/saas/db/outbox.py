@@ -21,6 +21,7 @@ async def enqueue_outbox_event(
     payload: dict[str, Any],
     workspace_id: str,
     project_id: str | None = None,
+    session: Any | None = None,
 ) -> str:
     event_id = new_outbox_id()
     now = datetime.now(UTC)
@@ -35,7 +36,10 @@ async def enqueue_outbox_event(
         "processed_at": None,
         "schema_version": 1,
     }
-    await db["outbox_events"].insert_one(doc)
+    kwargs: dict[str, Any] = {}
+    if session is not None:
+        kwargs["session"] = session
+    await db["outbox_events"].insert_one(doc, **kwargs)
     return event_id
 
 

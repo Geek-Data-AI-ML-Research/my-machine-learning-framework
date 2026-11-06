@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,12 +18,22 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     github_client_secret: str = ""
     github_oauth_stub: bool = True
-    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    cors_origins: str = (
+        "http://127.0.0.1:5173,http://localhost:5173,"
+        "http://127.0.0.1:5174,http://localhost:5174,"
+        "http://127.0.0.1:5175,http://localhost:5175"
+    )
     minio_endpoint: str = "http://127.0.0.1:9000"
     minio_bucket: str = "mymlfw"
     minio_access_key: str = "mymlfw"
     minio_secret_key: str = "mymlfwsecret"
     minio_region: str = "us-east-1"
+
+    @model_validator(mode="after")
+    def production_disables_oauth_stub(self) -> "Settings":
+        if self.env.strip().lower() in {"prod", "production"}:
+            self.github_oauth_stub = False
+        return self
 
 
 def get_settings() -> Settings:

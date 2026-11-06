@@ -1,7 +1,7 @@
-"""Notebook chunker stub: hypothesis + code + truncated output as one unit.
+"""Notebook chunker: hypothesis + code + truncated output as one unit.
 
-Full AST ``def``/``class`` tagging and RAG ingest land in Phase E. This module
-must not import ``mymlfw.train`` or engines.
+AST ``def``/``class`` tags land on each unit. Must not import ``mymlfw.train``
+or engines.
 """
 
 from __future__ import annotations

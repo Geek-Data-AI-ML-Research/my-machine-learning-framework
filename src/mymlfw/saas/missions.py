@@ -33,10 +33,12 @@ class MissionService:
         brain: CampaignBrainStore | None = None,
         project_db_factory: ProjectDbFactory | None = None,
         idem_store: IdempotencyStore | None = None,
+        mongo_db: Any | None = None,
     ) -> None:
         self.brain = brain or BRAIN_STORE
         self._project_db_factory = project_db_factory
         self.idem = idem_store or IdempotencyStore()
+        self._mongo = mongo_db
 
     def _pdb(self, workspace_id: str, project_id: str) -> ProjectScopedDB | None:
         if self._project_db_factory is None:
@@ -44,14 +46,23 @@ class MissionService:
         return self._project_db_factory(workspace_id, project_id)
 
     async def list_projects(self, workspace_id: str) -> ProjectListResponse:
-        # Ensure demo exists so agents always see at least one project.
-        org_slug = f"org-{workspace_id[-6:].lower()}"
-        self.brain.ensure_demo_campaign(org_id=workspace_id, org_slug=org_slug)
+        if self._mongo is not None:
+            from mymlfw.saas.db import project_data
+
+            return ProjectListResponse(
+                projects=await project_data.list_projects(self._mongo, workspace_id)
+            )
         return ProjectListResponse(projects=self.brain.list_projects(workspace_id))
 
     async def get_project_dashboard(
         self, workspace_id: str, project_id: str
     ) -> DashboardResponse | None:
+        if self._mongo is not None:
+            from mymlfw.saas.db import project_data
+
+            return await project_data.load_dashboard(
+                self._mongo, workspace_id, project_id
+            )
         pdb = self._pdb(workspace_id, project_id)
         if pdb is not None:
             proj = self.brain.get_project(workspace_id, project_id)
@@ -198,9 +209,28 @@ class MissionService:
         scope: str = "all",
         max_tokens: int = 512,
         detail_level: str = "summary",
+        query: str = "",
     ) -> QueryProjectBrainResponse:
-        _ = (workspace_id, project_id, scope, max_tokens, detail_level)
-        return QueryProjectBrainResponse()
+        _ = detail_level
+        from mymlfw.saas.advise import query_project_brain_from_store
+
+        store = self.brain
+        if self._mongo is not None:
+            from mymlfw.saas.db import project_data
+
+            hydrated = await project_data.hydrate_brain_store(
+                self._mongo, workspace_id, project_id
+            )
+            if hydrated is not None:
+                store = hydrated
+        return query_project_brain_from_store(
+            store,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            scope=scope,
+            max_tokens=max_tokens,
+            query=query,
+        )
 
     async def _claim(
         self,

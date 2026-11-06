@@ -1,39 +1,39 @@
 # Web UI (`web/`)
 
-ascii.rest terminal campaign console. Existing `site/` stays marketing; SaaS UI lives here.
+Campaign SaaS Studio console. Existing `site/` stays marketing; SaaS UI lives here.
 
-## Agent setup
+## Stack (binding)
 
-Install the ascii skill before editing UI:
+Preferred, current design system:
 
-```bash
-npx skills add bas3line/ascii
-```
+- **Tailwind CSS** (utility layout, typography, spacing, dark theme)
+- **[Charts.css](https://github.com/ChartsCSS/charts.css)** for pure-HTML/CSS metric charts (bars, lines, progress) — no Chart.js / heavy canvas chart libs unless a screen truly needs them
+- Semantic HTML first; progressive enhancement for interactivity in `public/` (or a later Vite/React layer if introduced)
 
-Pin ascii.rest v0.4+. Bundle pieces for offline Compose.
+Studio is **not** tied to ascii.rest. Do not add ascii.rest kit / Banner / terminal pieces as the default UI.
 
-## Five golden laws
+## UX laws
 
-1. **Text `<pre>` vs canvas:** text/ui/data/type/uncolored Banner → `<pre>` with `line-height: 1.2; margin: 0; font-variant-ligatures: none`. Logos/scenes → canvas; always **`mono`** inside workspace. Include ascii.rest **3 KB box-drawing** font fallback.
-2. **Motion = Active State:** animate only while running/syncing/transitioning; settle with `fps={0}` or static kit readout. No looping matrix-rain / doom-fire / marquee on data screens.
-3. **Compact banners:** secondary headers `<Banner font="slim" pixel={1} max={60} />`.
-4. **Live data via `ascii.rest/kit`:** `gauge` / `sparkline` / `progressBar` / `barChart` / `grid` / `glint` — not `pieces` demo loops. Hex only (`THEME_HEX`); no CSS vars / `#fff` / named colors in piece props.
-5. **One inverted-ink CTA** per screen; secondary actions as bracketed plain text. Fixed `:` command bar; j/k row cursor.
-6. **Primary nav = 6 modes (hotkeys 1–6):** BRAIN / GOALS / LAB / KAGGLE / OPS / TRUST — never 12 horizontal tabs at 88ch.
+1. **Readable dashboard:** Overview shows only important metrics (progress, public/CV score, rank when kaggle, open work). No metric walls.
+2. **Motion = Active State:** animate only while running/syncing/transitioning. No looping decorative motion on idle Overview.
+3. **One primary CTA** per screen; secondary actions as text/ghost controls.
+4. **Primary nav = 6 modes (hotkeys 1–6):** BRAIN / GOALS / LAB / KAGGLE / OPS / TRUST — keep Dead ends / Submissions as nested surfaces under Goals/Lab/Kaggle when needed, not a 12-tab top bar.
+5. **Accessible contrast** on the dark Studio theme; prefer CSS variables mapped through Tailwind theme tokens.
 
 ## DO
 
 - Keep OpenAPI + generated TS types in lockstep with `contracts/openapi.json`.
 - Dev persona switcher only when `MYMLFW_ENV=dev`.
 - SSE with `Last-Event-ID` when live strips land.
+- Vendor or build Tailwind + Charts.css for offline Compose (`deploy/Dockerfile.web`).
 
 ## DO NOT
 
-- Do **not** replace ascii.rest with Tailwind UI / Chart.js / Material.
-- Do **not** animate idle dashboards (`matrix-rain`, looping fireworks, marquee on Overview).
+- Do **not** rebuild Studio on ascii.rest / monospace kit boards as the design system.
 - Do **not** invent JSON field names — extend `schemas.py` + regenerate OpenAPI first.
 - Do **not** put JWT/PAT in SSE query strings.
+- Do **not** animate idle dashboards.
 
-## Wave 1
+## Migration note
 
-Thin monospace / ascii.rest shell for `/login` + `/studio` + DEV persona switcher stub. Full mode map lands Phase B+.
+Legacy `public/app.js` may still contain ascii.rest mounts (`vendor/mymlfw-ascii.js`). New UI work should migrate screens to Tailwind + Charts.css and remove ascii hosts when each screen is rewritten.

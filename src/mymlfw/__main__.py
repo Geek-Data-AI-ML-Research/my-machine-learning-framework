@@ -134,21 +134,41 @@ def _parser() -> argparse.ArgumentParser:
 
     cloud = sub.add_parser("cloud", exit_on_error=False)
     cloud_sub = cloud.add_subparsers(dest="cloud_cmd")
+    cloud_connect = cloud_sub.add_parser("connect", exit_on_error=False)
+    cloud_connect.add_argument("--provider", choices=("runpod", "aws"), required=True)
+    cloud_connect.add_argument("--api-key", default=None)
+    cloud_connect.add_argument("--role-arn", default=None)
+    cloud_connect.add_argument("--region", default="us-east-1")
+    cloud_disconnect = cloud_sub.add_parser("disconnect", exit_on_error=False)
+    cloud_disconnect.add_argument("--provider", choices=("runpod", "aws"), required=True)
+    cloud_sub.add_parser("list", exit_on_error=False)
+    cloud_gpus = cloud_sub.add_parser("gpus", exit_on_error=False)
+    cloud_gpus.add_argument("--provider", choices=("runpod", "aws"), required=True)
     launch = cloud_sub.add_parser("launch", exit_on_error=False)
-    launch.add_argument("--project", required=True)
-    launch.add_argument("--role", required=True)
-    launch.add_argument("--gpu", required=True)
-    launch.add_argument("--command", dest="shell_command", required=True)
-    launch.add_argument("--idle-kill", type=int, required=True)
-    launch.add_argument("--max-runtime", type=int, required=True)
-    launch.add_argument("--ledger", required=True)
-    launch.add_argument("--experiment-id", required=True)
-    launch.add_argument("--baseline-id", required=True)
-    launch.add_argument("--variable", required=True)
-    launch.add_argument("--band-low", type=float, required=True)
-    launch.add_argument("--band-high", type=float, required=True)
+    # SaaS provider launch (feature flag cloud_runners).
+    launch.add_argument("--provider", choices=("runpod", "aws"), default=None)
+    launch.add_argument("--gpu-type", default=None)
+    launch.add_argument("--quote-only", action="store_true")
+    launch.add_argument("--spot", action="store_true", default=True)
+    # Legacy contest render_launch path (requires --out + ledger fields).
+    launch.add_argument("--project", default=None)
+    launch.add_argument("--role", default=None)
+    launch.add_argument("--gpu", default=None)
+    launch.add_argument("--command", dest="shell_command", default=None)
+    launch.add_argument("--idle-kill", type=int, default=None)
+    launch.add_argument("--max-runtime", type=int, default=None)
+    launch.add_argument("--ledger", default=None)
+    launch.add_argument("--experiment-id", default=None)
+    launch.add_argument("--baseline-id", default=None)
+    launch.add_argument("--variable", default=None)
+    launch.add_argument("--band-low", type=float, default=None)
+    launch.add_argument("--band-high", type=float, default=None)
     launch.add_argument("--note", default="")
-    launch.add_argument("--out", required=True)
+    launch.add_argument("--out", default=None)
+    cloud_stop = cloud_sub.add_parser("stop", exit_on_error=False)
+    cloud_stop.add_argument("--runner-id", required=True)
+    cloud_terminate = cloud_sub.add_parser("terminate", exit_on_error=False)
+    cloud_terminate.add_argument("--runner-id", required=True)
 
     train = sub.add_parser("train", exit_on_error=False)
     train_sub = train.add_subparsers(dest="train_cmd")
@@ -245,6 +265,41 @@ def _parser() -> argparse.ArgumentParser:
 
     sub.add_parser("sync-docs", exit_on_error=False)
 
+    credits = sub.add_parser("credits", exit_on_error=False)
+    credits_sub = credits.add_subparsers(dest="credits_cmd")
+    for name in ("list", "scan", "add", "export"):
+        c = credits_sub.add_parser(name, exit_on_error=False)
+        c.add_argument("--project", default="prj_local")
+        c.add_argument("--name", default="numpy")
+        c.add_argument("--spdx", default="MIT")
+
+    kaggle = sub.add_parser("kaggle", exit_on_error=False)
+    kaggle_sub = kaggle.add_subparsers(dest="kaggle_cmd")
+    kaggle_intel = kaggle_sub.add_parser("intel", exit_on_error=False)
+    kaggle_intel.add_argument("--competition", required=True)
+    kaggle_pkg = kaggle_sub.add_parser("package", exit_on_error=False)
+    kaggle_pkg.add_argument("--file", action="append", required=True, dest="files")
+    kaggle_pkg.add_argument("--final2", action="append", default=[])
+
+    gitp = sub.add_parser("git", exit_on_error=False)
+    gitp.add_argument("--installation-id", default="")
+    git_sub = gitp.add_subparsers(dest="git_cmd")
+    git_sub.add_parser("link", exit_on_error=False)
+    git_sub.add_parser("sync", exit_on_error=False)
+
+    writeup = sub.add_parser("writeup", exit_on_error=False)
+    writeup.add_argument("--title", default="Campaign writeup")
+    writeup.add_argument("--summary", default="")
+
+    authp = sub.add_parser("auth", exit_on_error=False)
+    authp.add_argument("auth_cmd", nargs="?", default="whoami")
+
+    orgp = sub.add_parser("org", exit_on_error=False)
+    orgp.add_argument("org_cmd", nargs="?", default="current")
+
+    goalp = sub.add_parser("goal", exit_on_error=False)
+    goalp.add_argument("goal_cmd", nargs="?", default="list")
+
     project_cmd = sub.add_parser("project", exit_on_error=False)
     project_sub = project_cmd.add_subparsers(dest="project_cmd")
     project_dash = project_sub.add_parser("dashboard", exit_on_error=False)
@@ -266,7 +321,7 @@ def _parser() -> argparse.ArgumentParser:
     runner_start.add_argument(
         "--once",
         action="store_true",
-        help="Single heartbeat + claim then exit (stub).",
+        help="Single heartbeat + claim, then exit.",
     )
     runner_start.add_argument("--poll-seconds", type=float, default=5.0)
     runner_sub.add_parser("status", exit_on_error=False)
@@ -298,6 +353,70 @@ def _parser() -> argparse.ArgumentParser:
         help="Bearer token (default MYMLFW_TOKEN)",
     )
 
+    autopilot = sub.add_parser("autopilot", exit_on_error=False)
+    autopilot_sub = autopilot.add_subparsers(dest="autopilot_cmd")
+    ap_start = autopilot_sub.add_parser("start", exit_on_error=False)
+    ap_start.add_argument("--project", required=True)
+    ap_start.add_argument(
+        "--mode",
+        choices=(
+            "grandmaster_sweep",
+            "feature_evolution",
+            "paradigm_explorer",
+            "loss_and_postproc",
+        ),
+        default="grandmaster_sweep",
+    )
+    ap_start.add_argument("--hours", type=float, default=8.0)
+    ap_start.add_argument("--max-probes", type=int, default=64)
+    ap_start.add_argument("--max-gpu-hours", type=float, default=8.0)
+    ap_start.add_argument(
+        "--max-llm-usd",
+        type=float,
+        default=5.0,
+        help="LLM budget in dollars (stored as max_llm_cost_micros).",
+    )
+    ap_start.add_argument("--workspace", default="org_local")
+    ap_start.add_argument(
+        "--local",
+        action="store_true",
+        help=(
+            "Use in-process store (no API). Requires MYMLFW_NIGHT_SHIFT=1 "
+            "(does not bypass org feature_flags when calling the API)."
+        ),
+    )
+    ap_status = autopilot_sub.add_parser("status", exit_on_error=False)
+    ap_status.add_argument("--project", required=True)
+    ap_status.add_argument("--session", default=None)
+    ap_status.add_argument("--workspace", default="org_local")
+    ap_status.add_argument("--local", action="store_true")
+    ap_pause = autopilot_sub.add_parser("pause", exit_on_error=False)
+    ap_pause.add_argument("--project", required=True)
+    ap_pause.add_argument("--session", default=None)
+    ap_pause.add_argument("--workspace", default="org_local")
+    ap_pause.add_argument("--local", action="store_true")
+    ap_resume = autopilot_sub.add_parser("resume", exit_on_error=False)
+    ap_resume.add_argument("--project", required=True)
+    ap_resume.add_argument("--session", default=None)
+    ap_resume.add_argument("--workspace", default="org_local")
+    ap_resume.add_argument("--local", action="store_true")
+    ap_digest = autopilot_sub.add_parser("digest", exit_on_error=False)
+    ap_digest.add_argument("--project", required=True)
+    ap_digest.add_argument("--session", default=None)
+    ap_digest.add_argument("--workspace", default="org_local")
+    ap_digest.add_argument("--local", action="store_true")
+    for _ap in (ap_start, ap_status, ap_pause, ap_resume, ap_digest):
+        _ap.add_argument(
+            "--api",
+            default=None,
+            help="API base URL (default MYMLFW_API or http://127.0.0.1:8000)",
+        )
+        _ap.add_argument(
+            "--token",
+            default=None,
+            help="Bearer token (default MYMLFW_TOKEN)",
+        )
+
     return parser
 
 
@@ -305,6 +424,84 @@ def _dispatch(args) -> int:
     if args.command == "version":
         print(__version__)
         return 0
+    if args.command == "credits":
+        from mymlfw.saas.provenance import (
+            export_credits_bundle,
+            render_provenance_ascii_board,
+            sync_harvest_on_complete,
+        )
+
+        src = f"import {getattr(args, 'name', 'numpy')}\n"
+        project = getattr(args, "project", "prj_local")
+        credits, _jobs = sync_harvest_on_complete(
+            workspace_id="org_cli", project_id=project, source=src
+        )
+        if getattr(args, "credits_cmd", None) == "export":
+            print(json.dumps(export_credits_bundle(credits, title=project)))
+        else:
+            print(render_provenance_ascii_board(credits))
+        return 0
+    if args.command == "kaggle":
+        from mymlfw.saas.kaggle_service import intel_panel, package_submission
+
+        if args.kaggle_cmd == "package":
+            print(
+                json.dumps(
+                    package_submission(
+                        files=list(args.files),
+                        final2=list(args.final2 or []),
+                    )
+                )
+            )
+        elif args.kaggle_cmd == "intel":
+            print(json.dumps(intel_panel(competition=args.competition)))
+        else:
+            print(
+                json.dumps(
+                    {
+                        "error_code": "USAGE",
+                        "suggested_fix": "mymlfw kaggle intel --competition SLUG | kaggle package --file sub.csv",
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 2
+        return 0
+    if args.command == "git":
+        from mymlfw.saas.git_sync import git_sync_plan
+
+        if not args.installation_id:
+            print(
+                json.dumps(
+                    {
+                        "error_code": "GITHUB_APP_REQUIRED",
+                        "suggested_fix": "Pass --installation-id from the GitHub App install.",
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 2
+        print(json.dumps(git_sync_plan(installation_id=args.installation_id, pat_fallback=False)))
+        return 0
+    if args.command == "writeup":
+        from mymlfw.saas.writeup import render_writeup
+
+        print(render_writeup(title=args.title, summary=args.summary, credits=[]))
+        return 0
+    if args.command in {"auth", "org", "goal"}:
+        print(
+            json.dumps(
+                {
+                    "error_code": "USE_HTTP_API",
+                    "suggested_fix": (
+                        f"Call the Campaign API for {args.command}; "
+                        "the CLI does not mint a local success."
+                    ),
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 2
     if args.command == "profile-data":
         from mymlfw.campaign.profile import profile_dir
 
@@ -457,32 +654,102 @@ def _dispatch(args) -> int:
         manifest = build_notebook(args.src, args.out, args.payload)
         print(json.dumps({"notebook_sha256": manifest["notebook_sha256"]}))
         return 0
-    if args.command == "cloud" and args.cloud_cmd == "launch":
-        from pathlib import Path
+    if args.command == "cloud":
+        from mymlfw.saas.providers import cli as cloud_cli
 
-        from mymlfw.cloud import JobSpec, render_launch
+        if args.cloud_cmd == "connect":
+            print(
+                cloud_cli.cloud_connect(
+                    provider=args.provider,
+                    api_key=args.api_key,
+                    role_arn=args.role_arn,
+                    region=args.region,
+                )
+            )
+            return 0
+        if args.cloud_cmd == "disconnect":
+            print(cloud_cli.cloud_disconnect(provider=args.provider))
+            return 0
+        if args.cloud_cmd == "list":
+            print(cloud_cli.cloud_list())
+            return 0
+        if args.cloud_cmd == "gpus":
+            print(cloud_cli.cloud_gpus(provider=args.provider))
+            return 0
+        if args.cloud_cmd == "stop":
+            print(cloud_cli.cloud_stop(runner_id=args.runner_id))
+            return 0
+        if args.cloud_cmd == "terminate":
+            print(cloud_cli.cloud_terminate(runner_id=args.runner_id))
+            return 0
+        if args.cloud_cmd == "launch":
+            if args.provider:
+                if not args.gpu_type:
+                    raise MymlfwError("USAGE", "Pass --gpu-type with --provider")
+                print(
+                    cloud_cli.cloud_launch(
+                        provider=args.provider,
+                        gpu_type=args.gpu_type,
+                        quote_only=args.quote_only,
+                        spot=args.spot,
+                    )
+                )
+                return 0
+            # Legacy contest render_launch path.
+            missing = [
+                name
+                for name, val in (
+                    ("--project", args.project),
+                    ("--role", args.role),
+                    ("--gpu", args.gpu),
+                    ("--command", args.shell_command),
+                    ("--idle-kill", args.idle_kill),
+                    ("--max-runtime", args.max_runtime),
+                    ("--ledger", args.ledger),
+                    ("--experiment-id", args.experiment_id),
+                    ("--baseline-id", args.baseline_id),
+                    ("--variable", args.variable),
+                    ("--band-low", args.band_low),
+                    ("--band-high", args.band_high),
+                    ("--out", args.out),
+                )
+                if val is None
+            ]
+            if missing:
+                raise MymlfwError(
+                    "USAGE",
+                    "Legacy cloud launch requires ledger flags, or pass --provider/--gpu-type",
+                    missing=missing,
+                )
+            from pathlib import Path
 
-        spec = JobSpec(
-            project=args.project,
-            role=args.role,
-            gpu=args.gpu,
-            command=args.shell_command,
-            idle_kill_minutes=args.idle_kill,
-            max_runtime_minutes=args.max_runtime,
-            experiment_id=args.experiment_id,
-            baseline_id=args.baseline_id,
-            variable=args.variable,
-            expected_band_low=args.band_low,
-            expected_band_high=args.band_high,
-            note=args.note,
+            from mymlfw.cloud import JobSpec, render_launch
+
+            spec = JobSpec(
+                project=args.project,
+                role=args.role,
+                gpu=args.gpu,
+                command=args.shell_command,
+                idle_kill_minutes=args.idle_kill,
+                max_runtime_minutes=args.max_runtime,
+                experiment_id=args.experiment_id,
+                baseline_id=args.baseline_id,
+                variable=args.variable,
+                expected_band_low=args.band_low,
+                expected_band_high=args.band_high,
+                note=args.note,
+            )
+            script = render_launch(spec, args.ledger)
+            destination = Path(args.out)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(script)
+            destination.chmod(0o755)
+            print(destination)
+            return 0
+        raise MymlfwError(
+            "USAGE",
+            "Use: mymlfw cloud connect|list|gpus|launch|stop|terminate|disconnect",
         )
-        script = render_launch(spec, args.ledger)
-        destination = Path(args.out)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(script)
-        destination.chmod(0o755)
-        print(destination)
-        return 0
     if args.command == "train" and args.train_cmd == "lora":
         report = {}
         if args.dry_run:
@@ -786,6 +1053,146 @@ def _dispatch(args) -> int:
                 note=str(exc.reason),
             ) from exc
         return 0
+    if args.command == "autopilot":
+        import os
+        import urllib.error
+        import urllib.request
+
+        from mymlfw.saas.autopilot import (
+            AutopilotError,
+            digest_autopilot,
+            get_autopilot_status,
+            pause_autopilot,
+            resume_autopilot,
+            start_autopilot,
+            usd_to_micros,
+        )
+
+        cmd = args.autopilot_cmd
+        if cmd is None:
+            raise MymlfwError(
+                "USAGE",
+                "Use: mymlfw autopilot start|status|pause|resume|digest",
+            )
+
+        def _local_night_shift() -> bool:
+            raw = os.environ.get("MYMLFW_NIGHT_SHIFT", "0").strip().lower()
+            return raw in {"1", "true", "yes", "on"}
+
+        def _local_dispatch() -> int:
+            try:
+                if cmd == "start":
+                    out = start_autopilot(
+                        workspace_id=args.workspace,
+                        project_id=args.project,
+                        mode=args.mode,
+                        hours=args.hours,
+                        max_probes=args.max_probes,
+                        max_gpu_hours=args.max_gpu_hours,
+                        max_llm_cost_micros=usd_to_micros(args.max_llm_usd),
+                        night_shift_enabled=_local_night_shift(),
+                    )
+                elif cmd == "status":
+                    out = get_autopilot_status(
+                        project_id=args.project,
+                        session_id=args.session,
+                        workspace_id=getattr(args, "workspace", None) or "org_local",
+                    )
+                elif cmd == "pause":
+                    out = pause_autopilot(
+                        project_id=args.project,
+                        session_id=args.session,
+                        workspace_id=getattr(args, "workspace", None) or "org_local",
+                    )
+                elif cmd == "resume":
+                    out = resume_autopilot(
+                        project_id=args.project,
+                        session_id=args.session,
+                        night_shift_enabled=_local_night_shift(),
+                        workspace_id=getattr(args, "workspace", None) or "org_local",
+                    )
+                elif cmd == "digest":
+                    out = digest_autopilot(
+                        project_id=args.project,
+                        session_id=args.session,
+                        workspace_id=getattr(args, "workspace", None) or "org_local",
+                    )
+                    board = out.get("ascii_board")
+                    if board:
+                        print(board, file=sys.stderr)
+                else:
+                    raise MymlfwError("USAGE", f"Unknown autopilot subcommand {cmd}")
+            except AutopilotError as exc:
+                raise MymlfwError(exc.code.upper(), exc.message, **exc.extra) from exc
+            print(json.dumps(out, default=str))
+            return 0
+
+        use_local = bool(getattr(args, "local", False))
+        if use_local:
+            return _local_dispatch()
+
+        base = (
+            args.api
+            or os.environ.get("MYMLFW_API")
+            or "http://127.0.0.1:8000"
+        ).rstrip("/")
+        token = args.token or os.environ.get("MYMLFW_TOKEN") or ""
+        path_map = {
+            "start": ("POST", f"/v1/projects/{args.project}/autopilot/start"),
+            "status": ("GET", f"/v1/projects/{args.project}/autopilot/status"),
+            "pause": ("POST", f"/v1/projects/{args.project}/autopilot/pause"),
+            "resume": ("POST", f"/v1/projects/{args.project}/autopilot/resume"),
+            "digest": ("GET", f"/v1/projects/{args.project}/autopilot/digest"),
+        }
+        method, path = path_map[cmd]
+        if getattr(args, "session", None):
+            sep = "&" if "?" in path else "?"
+            path = f"{path}{sep}session_id={args.session}"
+        body = None
+        if cmd == "start":
+            body = json.dumps(
+                {
+                    "mode": args.mode,
+                    "hours": args.hours,
+                    "max_probes": args.max_probes,
+                    "max_gpu_hours": args.max_gpu_hours,
+                    "max_llm_usd": args.max_llm_usd,
+                }
+            ).encode("utf-8")
+        url = f"{base}{path}"
+        req = urllib.request.Request(url, data=body, method=method)
+        req.add_header("X-Mymlfw-Client-Version", __version__)
+        if body is not None:
+            req.add_header("Content-Type", "application/json")
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                raw = resp.read().decode("utf-8")
+            if cmd == "digest":
+                try:
+                    payload = json.loads(raw)
+                    board = payload.get("ascii_board")
+                    if board:
+                        print(board, file=sys.stderr)
+                except json.JSONDecodeError:
+                    pass
+            print(raw)
+            return 0
+        except urllib.error.HTTPError as exc:
+            note = exc.read().decode("utf-8", errors="replace")
+            raise MymlfwError(
+                "AUTOPILOT_HTTP",
+                "Pass --token / MYMLFW_TOKEN, --local, or a reachable --api.",
+                status=exc.code,
+                note=note,
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise MymlfwError(
+                "AUTOPILOT_UNREACHABLE",
+                "Start the API (make dev), pass --api, or use --local.",
+                note=str(exc.reason),
+            ) from exc
     raise MymlfwError("UNKNOWN_COMMAND", "Run python -m mymlfw version.")
 
 

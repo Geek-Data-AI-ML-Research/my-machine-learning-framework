@@ -1,6 +1,6 @@
 # SaaS package (`src/mymlfw/saas/`)
 
-Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot/provenance stubs, LLM gateway. Read root `AGENTS.md` Anti-drift first. Phase checklists live in the Campaign SaaS plan (Section checklists).
+Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot, cloud providers, LLM gateway. Read root `AGENTS.md` Anti-drift first. Human docs: [docs/how-to/run-campaign-saas.md](../../../docs/how-to/run-campaign-saas.md), [docs/how-to/connect-cloud-runners.md](../../../docs/how-to/connect-cloud-runners.md), [docs/reference/saas-env.md](../../../docs/reference/saas-env.md). Phase checklists live in the Campaign SaaS plan (Section checklists).
 
 ## DO
 
@@ -22,7 +22,7 @@ Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot
 - Do **not** store embeddings as `list[float]`, money as float USD, or naive datetimes.
 - Do **not** open a second lever while one is `open`; use `active_execution_lock`.
 - Do **not** auto-submit to Kaggle from Autopilot.
-- Do **not** return advise without `citation_firewall` (when advise lands).
+- Do **not** return advise without `citation_firewall` (`saas/advise.py` → `rag/citation_firewall`).
 - Do **not** let LLMs emit raw bash `cli_steps` — only `template_id` + typed args.
 
 ## Where to change
@@ -31,11 +31,14 @@ Campaign SaaS control plane: tenants, project brain services, ensemble/autopilot
 | --- | --- |
 | Mongo client / ScopedCollection / indexes | `saas/db/` |
 | API contracts | `saas/schemas.py`, `contracts/openapi.json` |
-| Project brain RAG | `saas/rag/` (+ its AGENTS.md) |
+| Project brain RAG / advise | `saas/advise.py`, `saas/rag/` (+ rag AGENTS.md); HTTP `/advise` + `/brain/query` |
 | OOF pending→confirm HEAD→ready | `artifacts.py`, `storage.py` |
 | Research modes / error_slices | `research.py` |
 | Notebook units (hypothesis+code+output) | `rag/notebook_chunker.py` |
 | Local BYOC runner | `mymlfw.runner` (`mymlfw runner start\|status`) |
-| Fair-share queue stub | `mymlfw.worker.fair_share` |
+| Fair-share queue | `mymlfw.worker.fair_share` |
 | Nested-CV ensemble (Caruana+SLSQP, ascii board) | `ensemble.py` |
-| Autopilot / cloud providers | `autopilot.py`, `providers/` (**stubs** until pc-autopilot / pc-cloud-providers) |
+| Autopilot | `autopilot.py` (UCT+halving, flag `night_shift`) |
+| Cloud providers (RunPod/AWS) | `providers/` — live when credentials sealed; mock under pytest / `MYMLFW_CLOUD_MOCK=1` |
+| Secret envelope | `secrets/envelope.py` (AES-256-GCM) |
+| Object storage | `storage.py` (MinIO HEAD required before OOF `ready`) |

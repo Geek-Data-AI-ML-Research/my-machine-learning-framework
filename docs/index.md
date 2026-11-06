@@ -27,6 +27,10 @@ Task-oriented. Each page assumes the tutorial is done.
 - [Advise a contest](how-to/advise-a-contest.md)
 - [Blend and gate a submission](how-to/blend-and-gate.md)
 - [Remember, ingest, and search](how-to/use-memory.md)
+- [Run the Campaign SaaS stack](how-to/run-campaign-saas.md)
+- [Connect cloud runners (RunPod / AWS)](how-to/connect-cloud-runners.md)
+- [MCP walking skeleton](how-to/mcp-walking-skeleton.md)
+- [Keep a Studio project updated via MCP](how-to/agent-mcp-campaign-sync.md)
 
 ## Reference
 
@@ -35,6 +39,8 @@ Information-oriented. Tables, not a narrative.
 - [CLI](reference/cli.md)
 - [Contest layout](reference/contest-layout.md)
 - [Ledger](reference/ledger.md)
+- [SaaS environment and flags](reference/saas-env.md)
+- [SaaS plan → API → GUI parity](reference/saas-plan-parity-matrix.md)
 
 ## Explanation
 
@@ -42,3 +48,8 @@ Understanding-oriented. Read these before changing a boundary.
 
 - [Architecture](explanation/architecture.md)
 - [Invariants](explanation/invariants.md)
+- [Campaign SaaS cloud providers](explanation/campaign-saas-cloud.md)
+- [Project Brain RAG](explanation/project-brain-rag.md)
+- [GM cockpit](explanation/gm-cockpit.md)
+- [Scoped Mongo](explanation/scoped-db.md)
+- [Night shift](explanation/night-shift.md)

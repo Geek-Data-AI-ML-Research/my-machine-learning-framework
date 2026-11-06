@@ -29,6 +29,7 @@ saas = [
   "redis>=5.2",
   "python-ulid>=3.0",
   "passlib[argon2]>=1.7.4",
+  "cryptography>=43",
   "opentelemetry-api>=1.28",
   "opentelemetry-sdk>=1.28",
   "mcp>=1.0,<3",

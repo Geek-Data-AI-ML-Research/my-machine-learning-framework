@@ -94,12 +94,90 @@ class DevAuthStore:
         )
 
     def github_oauth_stub(self, code: str) -> TokenResponse:
-        """Stub: exchange code for a deterministic dev user."""
+        """Dev-only: exchange code for a deterministic local user."""
         email = f"gh_{code[:12] or 'dev'}@users.noreply.github.com"
         password = "gh-oauth-stub"
         if email not in self.by_email:
             return self.register(email, password, "GitHub Dev")
         return self.login(email, password)
+
+    def github_oauth_live(
+        self,
+        *,
+        code: str,
+        client_id: str,
+        client_secret: str,
+    ) -> TokenResponse:
+        """Exchange GitHub OAuth code for a real user (billable identity path)."""
+        import json
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        token_body = urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "code": code,
+            }
+        ).encode("utf-8")
+        token_req = urllib.request.Request(
+            "https://github.com/login/oauth/access_token",
+            data=token_body,
+            method="POST",
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        )
+        try:
+            with urllib.request.urlopen(token_req, timeout=20) as resp:  # noqa: S310
+                token_payload = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise ValueError("github_token_exchange_failed") from exc
+        access = token_payload.get("access_token")
+        if not access:
+            raise ValueError("github_token_missing")
+        user_req = urllib.request.Request(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {access}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "mymlfw-saas",
+            },
+        )
+        try:
+            with urllib.request.urlopen(user_req, timeout=20) as resp:  # noqa: S310
+                profile = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise ValueError("github_user_fetch_failed") from exc
+        login = str(profile.get("login") or "github")
+        email = str(profile.get("email") or f"{login}@users.noreply.github.com").lower()
+        display = str(profile.get("name") or login)
+        if email not in self.by_email:
+            # Opaque local password — GitHub users re-auth via OAuth only.
+            import secrets
+
+            return self.register(email, secrets.token_urlsafe(32), display)
+        user_id = self.by_email[email]
+        token = f"tok_{ULID()}"
+        self.sessions[token] = user_id
+        return TokenResponse(
+            access_token=token,
+            user_id=user_id,
+            org_id=self.memberships.get(user_id),
+        )
+
+    def update_feature_flags(self, org_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+        org = self.orgs.get(org_id)
+        if org is None:
+            raise ValueError("org_not_found")
+        flags = dict(org.get("feature_flags") or {})
+        for key, value in updates.items():
+            if value is not None:
+                flags[key] = bool(value)
+        org["feature_flags"] = flags
+        return org
 
     def resolve(self, token: str) -> dict[str, Any] | None:
         user_id = self.sessions.get(token)

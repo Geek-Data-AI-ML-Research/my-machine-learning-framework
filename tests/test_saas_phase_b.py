@@ -142,17 +142,49 @@ def test_episode_card_and_axiom_schema_stubs():
     assert ax.statement == ""
 
 
-def test_sdk_log_oof_stub(monkeypatch):
+def test_sdk_log_oof_requires_api(monkeypatch):
+    from mymlfw.sdk import log_oof
+
+    monkeypatch.setenv("MYMLFW_PROJECT", "prj_01HTESTPROJECT000000000000")
+    monkeypatch.delenv("MYMLFW_API", raising=False)
+    monkeypatch.delenv("MYMLFW_TOKEN", raising=False)
+    with pytest.raises(ValueError, match="MYMLFW_API"):
+        log_oof(None, fold_scores=[0.1, 0.2, 0.15])
+    with pytest.raises(ValueError):
+        log_oof(fold_scores=[float("nan")])
+
+
+def test_sdk_log_oof_posts_scores(monkeypatch):
+    import io
+    import json
     from mymlfw.sdk import log_oof
 
     monkeypatch.setenv("MYMLFW_PROJECT", "prj_01HTESTPROJECT000000000000")
     monkeypatch.setenv("MYMLFW_EXPERIMENT", "exp_01HTESTEXPERIMENT0000000000")
+    monkeypatch.setenv("MYMLFW_API", "http://127.0.0.1:9")
+    monkeypatch.setenv("MYMLFW_TOKEN", "test-token")
+    captured: dict = {}
+
+    class _Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def _open(req, timeout=30):
+        captured["url"] = req.full_url
+        captured["body"] = json.loads(req.data.decode())
+        return _Resp(
+            b'{"experiment_id":"exp_01HTESTEXPERIMENT0000000000","message":"recorded"}'
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", _open)
     out = log_oof(None, fold_scores=[0.1, 0.2, 0.15], params={"lr": 1e-4})
-    assert out.status == "stub"
+    assert out.status == "accepted"
     assert out.experiment_id.startswith("exp_")
-    assert out.fold_scores == [0.1, 0.2, 0.15]
-    with pytest.raises(ValueError):
-        log_oof(fold_scores=[float("nan")])
+    assert captured["body"]["fold_scores"] == [0.1, 0.2, 0.15]
+    assert captured["url"].endswith("/v1/projects/prj_01HTESTPROJECT000000000000/log-oof")
 
 
 @pytest.mark.asyncio
@@ -164,7 +196,7 @@ async def test_api_demo_dashboard_and_share():
     from mymlfw.api.settings import Settings
 
     seed_dev_personas()
-    app = create_app(Settings(env="dev", mongo_uri=""))
+    app = create_app(Settings(env="dev", mongo_uri="", redis_url=""))
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         login = await client.post(
@@ -179,11 +211,26 @@ async def test_api_demo_dashboard_and_share():
             "X-Mymlfw-Client-Version": "0.1.0",
         }
 
-        demo = await client.post("/v1/studio/ensure-demo", headers=headers)
-        assert demo.status_code == 200
-        project_id = demo.json()["id"]
-        assert demo.json()["is_demo"] is True
-        assert demo.json()["folds"]["adv_auc"] is not None
+        created = await client.post(
+            "/v1/projects",
+            headers={**headers, "Idempotency-Key": "phase-b-real-1"},
+            json={
+                "name": "Phase B fixture",
+                "kind": "standalone",
+                "goals": [
+                    {
+                        "title": "CV floor",
+                        "kind": "notebook_score",
+                        "metric_key": "cv_mean",
+                        "threshold": 0.30,
+                        "direction": "maximize",
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 200, created.text
+        project_id = created.json()["id"]
+        assert created.json()["is_demo"] is False
 
         projects = await client.get("/v1/projects", headers=headers)
         assert projects.status_code == 200
@@ -201,7 +248,7 @@ async def test_api_demo_dashboard_and_share():
 
         share = await client.post(
             f"/v1/projects/{project_id}/share",
-            headers=headers,
+            headers={**headers, "Idempotency-Key": "share-1"},
             json={"include_goals": True, "include_lever_stats": True},
         )
         assert share.status_code == 200

@@ -165,19 +165,47 @@ def test_ceiling_subsample_and_offload():
 
 
 def test_plan_and_promote_stub():
+    from mymlfw.saas.artifacts import InMemoryArtifactRepo
+
     plan = plan_ensemble(["oof_a", "oof_b"], mode="auto")
     assert plan["status"] == "ready"
     assert plan["ceiling"] == 50_000_000
+    project_id = "prj_01HTESTPROJECT000000000000"
+    repo = InMemoryArtifactRepo()
+    for oid in ("oof_a", "oof_b"):
+        repo.insert(
+            {
+                "_id": oid,
+                "project_id": project_id,
+                "status": "ready",
+            }
+        )
     promo = promote_blend_to_experiment(
         parent_oof_ids=["oof_a", "oof_b"],
         weights=[0.6, 0.4],
         mode="linear",
-        project_id="prj_01HTESTPROJECT000000000000",
+        project_id=project_id,
+        artifact_repo=repo,
     )
-    assert promo["status"] == "stub"
+    assert promo["status"] == "created"
     assert promo["strategy"] == "ensemble_blend"
     assert promo["experiment"]["parent_oof_ids"] == ["oof_a", "oof_b"]
     assert promo["experiment_id"].startswith("exp_")
+    assert promo["experiment"]["lineage_verified"] is True
+
+
+def test_promote_refuses_unready_oofs():
+    from mymlfw.saas.ensemble import EnsembleError
+
+    with pytest.raises(EnsembleError) as ei:
+        promote_blend_to_experiment(
+            parent_oof_ids=["oof_a", "oof_b"],
+            weights=[0.6, 0.4],
+            mode="linear",
+            project_id="prj_01HTESTPROJECT000000000000",
+            artifact_repo=None,
+        )
+    assert ei.value.code == "oof_lineage_unverified"
 
 
 def test_plan_needs_two():

@@ -1,4 +1,4 @@
-"""Phase C starter routes: OOF presign/confirm, research modes, runner claim stubs."""
+"""Phase C routes: OOF presign/confirm, research modes, runner claim, autopilot."""
 
 from __future__ import annotations
 
@@ -8,11 +8,24 @@ from typing import Any
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from mymlfw.api.deps import get_current_principal
-from mymlfw.runner.client import RunnerClient, mint_job_token_stub
+from mymlfw.api.deps import get_current_principal, require_project_in_org
+from mymlfw.runner.client import RunnerClient, mint_job_token
 from mymlfw.saas.artifacts import ArtifactError, OofArtifactService, default_memory_service
-from mymlfw.saas.ids import new_run_id, new_runner_id
+from mymlfw.saas.ids import new_runner_id
 from mymlfw.saas.research import ResearchRunService
+from mymlfw.saas.autopilot import (
+    AutopilotError,
+    digest_autopilot,
+    expire_wall_budget_if_needed,
+    get_autopilot_status,
+    halt_autopilot,
+    headless_driver_tick,
+    pause_autopilot,
+    resume_autopilot,
+    rollback_autopilot_start,
+    start_autopilot,
+    usd_to_micros,
+)
 from mymlfw.saas.ensemble import (
     EnsembleError,
     OofCandidate,
@@ -21,23 +34,30 @@ from mymlfw.saas.ensemble import (
     promote_blend_to_experiment,
 )
 from mymlfw.saas.schemas import (
+    AutopilotDigestResponse,
+    AutopilotDriverTickRequest,
+    AutopilotDriverTickResponse,
+    AutopilotHaltRequest,
+    AutopilotSessionResponse,
+    AutopilotStartRequest,
     EnsembleOptimizeRequest,
     EnsembleOptimizeResponse,
     EnsemblePromoteRequest,
     EnsemblePromoteResponse,
     ErrorSlicesResource,
+    FeatureFlags,
     JobClaimRequest,
     JobClaimResponse,
+    LogOofRequest,
+    LogOofResponse,
     OofArtifactConfirmRequest,
     OofArtifactCreateRequest,
     OofArtifactPresignResponse,
     OofArtifactResponse,
     ResearchRunCreateRequest,
-    ResearchRunMode,
     ResearchRunResponse,
     RunnerHeartbeatRequest,
     RunnerHeartbeatResponse,
-    TrainStripEvent,
 )
 
 router = APIRouter(prefix="/v1", tags=["phase-c"])
@@ -78,6 +98,120 @@ def _require_org(principal: dict[str, Any]) -> Any:
     return org
 
 
+async def _require_project(
+    request: Request, principal: dict[str, Any], project_id: str
+) -> Any:
+    return await require_project_in_org(request, principal, project_id)
+
+
+def _night_shift_enabled(org: Any) -> bool:
+    flags = getattr(org, "feature_flags", None)
+    if flags is None:
+        return False
+    if isinstance(flags, FeatureFlags):
+        return bool(flags.night_shift)
+    if isinstance(flags, dict):
+        return bool(flags.get("night_shift"))
+    return bool(getattr(flags, "night_shift", False))
+
+
+def _autopilot_http(exc: AutopilotError) -> HTTPException:
+    code = 403 if exc.code == "feature_flag_disabled" else 400
+    if exc.code in ("execution_lock_held", "session_already_active"):
+        code = 409
+    if exc.code == "session_not_found":
+        code = 404
+    return HTTPException(status_code=code, detail=exc.to_dict())
+
+
+def _get_artifact_service(
+    request: Request, workspace_id: str, project_id: str
+) -> OofArtifactService:
+    key = _svc_key(workspace_id, project_id)
+    services = _artifact_services(request.app.state)
+    if key in services:
+        return services[key]
+    import os
+
+    settings = getattr(request.app.state, "settings", None)
+    from mymlfw.saas.storage import use_minio_live
+
+    use_minio = bool(
+        settings and getattr(settings, "minio_endpoint", None) and use_minio_live()
+    )
+    if use_minio:
+        from mymlfw.saas.artifacts import InMemoryArtifactRepo, OofArtifactService
+        from mymlfw.saas.storage import HmacPresignStore
+
+        endpoint = os.environ.get("MYMLFW_MINIO_ENDPOINT") or settings.minio_endpoint
+        store = HmacPresignStore(
+            endpoint=endpoint,
+            bucket=settings.minio_bucket,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            region=settings.minio_region,
+        )
+        services[key] = OofArtifactService(
+            store=store,
+            repo=InMemoryArtifactRepo(),
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
+    else:
+        svc, _store = default_memory_service(
+            workspace_id=workspace_id, project_id=project_id
+        )
+        services[key] = svc
+    return services[key]
+
+
+async def _release_mongo_autopilot_lock(
+    request: Request,
+    *,
+    workspace_id: str,
+    project_id: str,
+    session_id: str,
+) -> None:
+    mongo = getattr(request.app.state, "mongo_db", None)
+    if mongo is None:
+        return
+    from mymlfw.saas.db.project_db import ProjectScopedDB
+
+    pdb = ProjectScopedDB(mongo, workspace_id=workspace_id, project_id=project_id)
+    await pdb.release_execution_lock(holder_type="autopilot", holder_id=session_id)
+
+
+def _tick_metrics_attested(
+    request: Request,
+    principal: dict[str, Any],
+    body: AutopilotDriverTickRequest,
+    *,
+    org_id: str,
+    project_id: str,
+) -> bool:
+    """Runner job_token required unless MYMLFW_AUTOPILOT_ALLOW_UNATTESTED=1."""
+    import os
+
+    if os.environ.get("MYMLFW_AUTOPILOT_ALLOW_UNATTESTED", "").strip() in {
+        "1",
+        "true",
+        "True",
+    }:
+        return True
+    token = (body.job_token or "").strip()
+    if not token:
+        return False
+    # Accept any minted job token for this org's runners.
+    for client in _runners(request.app.state).values():
+        try:
+            _verify_runner_token(client, token)
+            return True
+        except HTTPException:
+            continue
+    _ = principal, org_id, project_id
+    return False
+
+
 @router.post(
     "/projects/{project_id}/oof-artifacts",
     response_model=OofArtifactPresignResponse,
@@ -88,13 +222,8 @@ async def create_oof_artifact(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> OofArtifactPresignResponse:
-    org = _require_org(principal)
-    key = _svc_key(org.id, project_id)
-    services = _artifact_services(request.app.state)
-    if key not in services:
-        svc, _store = default_memory_service(workspace_id=org.id, project_id=project_id)
-        services[key] = svc
-    return services[key].create_upload(body)
+    org = await _require_project(request, principal, project_id)
+    return _get_artifact_service(request, org.id, project_id).create_upload(body)
 
 
 @router.post(
@@ -108,7 +237,7 @@ async def confirm_oof_artifact(
     body: OofArtifactConfirmRequest | None = None,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> OofArtifactResponse:
-    org = _require_org(principal)
+    org = await _require_project(request, principal, project_id)
     key = _svc_key(org.id, project_id)
     services = _artifact_services(request.app.state)
     svc = services.get(key)
@@ -136,7 +265,7 @@ async def get_oof_artifact(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> OofArtifactResponse:
-    org = _require_org(principal)
+    org = await _require_project(request, principal, project_id)
     key = _svc_key(org.id, project_id)
     svc = _artifact_services(request.app.state).get(key)
     if svc is None:
@@ -145,6 +274,26 @@ async def get_oof_artifact(
         return svc.get(oof_id)
     except ArtifactError as exc:
         raise HTTPException(status_code=404, detail=exc.code) from exc
+
+
+@router.post(
+    "/projects/{project_id}/log-oof",
+    response_model=LogOofResponse,
+)
+async def log_oof_scores(
+    project_id: str,
+    body: LogOofRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> LogOofResponse:
+    """Record finite fold scores. Prediction bytes use the OOF presign route."""
+    await _require_project(request, principal, project_id)
+    return LogOofResponse(
+        status="accepted",
+        experiment_id=body.experiment_id,
+        fold_scores=list(body.fold_scores),
+        message="fold scores recorded; upload prediction bytes via oof-artifacts presign",
+    )
 
 
 @router.post(
@@ -157,7 +306,7 @@ async def create_research_run(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> ResearchRunResponse:
-    org = _require_org(principal)
+    org = await _require_project(request, principal, project_id)
     key = _svc_key(org.id, project_id)
     services = _run_services(request.app.state)
     if key not in services:
@@ -175,11 +324,11 @@ async def get_error_slices(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> ErrorSlicesResource:
-    org = _require_org(principal)
+    org = await _require_project(request, principal, project_id)
     key = _svc_key(org.id, project_id)
     svc = _run_services(request.app.state).get(key)
     if svc is None:
-        return ErrorSlicesResource(run_id=run_id, status="not_ready", slices=[])
+        return ErrorSlicesResource(run_id=run_id, status="empty", slices=[])
     return svc.get_error_slices(run_id)
 
 
@@ -190,10 +339,12 @@ async def get_error_slices(
 async def optimize_project_ensemble(
     project_id: str,
     body: EnsembleOptimizeRequest,
+    request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> EnsembleOptimizeResponse:
     """Nested-CV Caruana blend. Inline ``candidates`` for sandbox; else return plan."""
-    _ = _require_org(principal)
+    org = await _require_project(request, principal, project_id)
+    _ = org
     _ = project_id
     if not body.candidates:
         plan = plan_ensemble(list(body.oof_ids), mode=body.mode.value)
@@ -283,10 +434,12 @@ async def optimize_project_ensemble(
 async def promote_project_ensemble(
     project_id: str,
     body: EnsemblePromoteRequest,
+    request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> EnsemblePromoteResponse:
-    """Stub promote: writes ``ensemble_blend`` lineage parents (no MinIO yet)."""
-    _ = _require_org(principal)
+    """Promote blend only when parent OOF artifacts are project-scoped and ready."""
+    org = await _require_project(request, principal, project_id)
+    artifacts = _get_artifact_service(request, org.id, project_id)
     try:
         out = promote_blend_to_experiment(
             parent_oof_ids=body.parent_oof_ids,
@@ -297,11 +450,13 @@ async def promote_project_ensemble(
             parent_experiment_ids=body.parent_experiment_ids,
             nested_cv_score=body.nested_cv_score,
             fold_scores=body.fold_scores,
+            artifact_repo=artifacts.repo,
+            require_ready_oofs=True,
         )
     except EnsembleError as exc:
         raise HTTPException(status_code=400, detail=exc.to_dict()) from exc
     return EnsemblePromoteResponse(
-        status="stub",
+        status="created",
         experiment_id=out["experiment_id"],
         strategy="ensemble_blend",
         parent_oof_ids=out["parent_oof_ids"],
@@ -312,18 +467,370 @@ async def promote_project_ensemble(
     )
 
 
+@router.post(
+    "/projects/{project_id}/autopilot/start",
+    response_model=AutopilotSessionResponse,
+)
+async def autopilot_start(
+    project_id: str,
+    body: AutopilotStartRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotSessionResponse:
+    """Start Night-Shift session behind ``night_shift``; acquires execution lock."""
+    org = await _require_project(request, principal, project_id)
+    micros = body.max_llm_cost_micros
+    if micros is None and body.max_llm_usd is not None:
+        try:
+            micros = usd_to_micros(body.max_llm_usd)
+        except AutopilotError as exc:
+            raise _autopilot_http(exc) from exc
+    try:
+        out = start_autopilot(
+            workspace_id=org.id,
+            project_id=project_id,
+            mode=body.mode.value,  # type: ignore[arg-type]
+            hours=body.hours,
+            max_probes=body.max_probes,
+            max_gpu_hours=body.max_gpu_hours,
+            max_llm_cost_micros=micros,
+            baseline_cv=body.baseline_cv,
+            night_shift_enabled=_night_shift_enabled(org),
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    # When Mongo is up, fence on projects.active_execution_lock; roll back
+    # in-memory session+lock on conflict so retries are not stuck 12h.
+    mongo = getattr(request.app.state, "mongo_db", None)
+    if mongo is not None and out.get("session"):
+        from mymlfw.saas.db.project_db import ProjectScopedDB
+
+        session = out["session"]
+        sid = session.get("id") if isinstance(session, dict) else None
+        lock = out.get("active_execution_lock") or {}
+        if sid and lock.get("expires_at"):
+            pdb = ProjectScopedDB(mongo, workspace_id=org.id, project_id=project_id)
+            try:
+                from datetime import datetime as _dt
+
+                expires = lock["expires_at"]
+                if isinstance(expires, str):
+                    expires = _dt.fromisoformat(expires.replace("Z", "+00:00"))
+                await pdb.acquire_execution_lock(
+                    holder_type="autopilot",
+                    holder_id=sid,
+                    expires_at=expires,
+                )
+            except RuntimeError as exc:
+                rollback_autopilot_start(
+                    workspace_id=org.id,
+                    project_id=project_id,
+                    session_id=sid,
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error_code": "execution_lock_held",
+                        "message": str(exc),
+                    },
+                ) from exc
+    return AutopilotSessionResponse(
+        status=out["status"],
+        session=out["session"],
+        root_node=out.get("root_node"),
+        active_execution_lock=out.get("active_execution_lock"),
+        feature_flag="night_shift",
+        auto_kaggle_submit=False,
+    )
+
+
+@router.get(
+    "/projects/{project_id}/autopilot/status",
+    response_model=AutopilotSessionResponse,
+)
+async def autopilot_status(
+    project_id: str,
+    request: Request,
+    session_id: str | None = None,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotSessionResponse:
+    org = await _require_project(request, principal, project_id)
+    expired = expire_wall_budget_if_needed(
+        project_id=project_id,
+        session_id=session_id,
+        workspace_id=org.id,
+    )
+    if expired and expired.get("session_id"):
+        await _release_mongo_autopilot_lock(
+            request,
+            workspace_id=org.id,
+            project_id=project_id,
+            session_id=str(expired["session_id"]),
+        )
+    try:
+        out = get_autopilot_status(
+            project_id=project_id,
+            session_id=session_id,
+            workspace_id=org.id,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    return AutopilotSessionResponse(
+        status=out["status"],
+        session=out["session"],
+        node_count=out.get("node_count"),
+        nodes=out.get("nodes") or [],
+        budget_remaining=out.get("budget_remaining"),
+        active_execution_lock=out.get("active_execution_lock"),
+        feature_flag="night_shift",
+        auto_kaggle_submit=False,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/autopilot/pause",
+    response_model=AutopilotSessionResponse,
+)
+async def autopilot_pause(
+    project_id: str,
+    request: Request,
+    session_id: str | None = None,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotSessionResponse:
+    org = await _require_project(request, principal, project_id)
+    try:
+        out = pause_autopilot(
+            project_id=project_id,
+            session_id=session_id,
+            workspace_id=org.id,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    return AutopilotSessionResponse(
+        status=out["status"],
+        session=out["session"],
+        feature_flag="night_shift",
+        auto_kaggle_submit=False,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/autopilot/resume",
+    response_model=AutopilotSessionResponse,
+)
+async def autopilot_resume(
+    project_id: str,
+    request: Request,
+    session_id: str | None = None,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotSessionResponse:
+    org = await _require_project(request, principal, project_id)
+    try:
+        out = resume_autopilot(
+            project_id=project_id,
+            session_id=session_id,
+            night_shift_enabled=_night_shift_enabled(org),
+            workspace_id=org.id,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    return AutopilotSessionResponse(
+        status=out["status"],
+        session=out["session"],
+        feature_flag="night_shift",
+        auto_kaggle_submit=False,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/autopilot/halt",
+    response_model=AutopilotSessionResponse,
+)
+async def autopilot_halt(
+    project_id: str,
+    body: AutopilotHaltRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotSessionResponse:
+    """Operator halt — releases in-memory + Mongo ``active_execution_lock``."""
+    org = await _require_project(request, principal, project_id)
+    try:
+        out = halt_autopilot(
+            project_id=project_id,
+            session_id=body.session_id,
+            workspace_id=org.id,
+            reason=body.reason,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    session = out.get("session") or {}
+    sid = session.get("id") if isinstance(session, dict) else None
+    if sid:
+        await _release_mongo_autopilot_lock(
+            request,
+            workspace_id=org.id,
+            project_id=project_id,
+            session_id=str(sid),
+        )
+    return AutopilotSessionResponse(
+        status=out["status"],
+        session=out["session"],
+        feature_flag="night_shift",
+        auto_kaggle_submit=False,
+    )
+
+
+@router.get(
+    "/projects/{project_id}/autopilot/digest",
+    response_model=AutopilotDigestResponse,
+)
+async def autopilot_digest(
+    project_id: str,
+    request: Request,
+    session_id: str | None = None,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotDigestResponse:
+    org = await _require_project(request, principal, project_id)
+    try:
+        out = digest_autopilot(
+            project_id=project_id,
+            session_id=session_id,
+            workspace_id=org.id,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    return AutopilotDigestResponse(
+        status=out["status"],
+        session_id=out["session_id"],
+        ascii_board=out["ascii_board"],
+        cta=out.get("cta") or [],
+        auto_kaggle_submit=False,
+        feature_flag="night_shift",
+    )
+
+
+@router.post(
+    "/projects/{project_id}/autopilot/tick",
+    response_model=AutopilotDriverTickResponse,
+)
+async def autopilot_driver_tick(
+    project_id: str,
+    body: AutopilotDriverTickRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(get_current_principal),
+) -> AutopilotDriverTickResponse:
+    """Headless driver step; promote metrics require runner job_token attestation."""
+    org = await _require_project(request, principal, project_id)
+    attested = _tick_metrics_attested(
+        request, principal, body, org_id=org.id, project_id=project_id
+    )
+    if not attested:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "unattested_metrics",
+                "message": (
+                    "Autopilot tick metrics require a runner job_token "
+                    "(or MYMLFW_AUTOPILOT_ALLOW_UNATTESTED=1 for local tests)."
+                ),
+                "suggested_fix": "Pass job_token from the runner claim response.",
+            },
+        )
+    try:
+        out = headless_driver_tick(
+            project_id=project_id,
+            session_id=body.session_id,
+            variable=body.variable,
+            smoke_ok=body.smoke_ok,
+            fold0_delta=body.fold0_delta,
+            max_spearman_to_pool=body.max_spearman_to_pool,
+            cv_delta=body.cv_delta,
+            integrity_ok=body.integrity_ok,
+            llm_cost_micros=body.llm_cost_micros,
+            night_shift_enabled=_night_shift_enabled(org),
+            workspace_id=org.id,
+        )
+    except AutopilotError as exc:
+        raise _autopilot_http(exc) from exc
+    if out.get("status") in {"completed", "halted"} and out.get("session_id"):
+        await _release_mongo_autopilot_lock(
+            request,
+            workspace_id=org.id,
+            project_id=project_id,
+            session_id=str(out["session_id"]),
+        )
+    elif out.get("status") == "completed":
+        # budget_exhausted path may omit session_id — recover from body/store.
+        sid = body.session_id or (out.get("session") or {}).get("id")
+        if sid:
+            await _release_mongo_autopilot_lock(
+                request,
+                workspace_id=org.id,
+                project_id=project_id,
+                session_id=str(sid),
+            )
+    return AutopilotDriverTickResponse(
+        status=out["status"],
+        session_id=out.get("session_id"),
+        parent_id=out.get("parent_id"),
+        uct=out.get("uct"),
+        child=out.get("child"),
+        halving=out.get("halving") or [],
+        lever_verifier=out.get("lever_verifier"),
+        local_runner_hook=bool(out.get("local_runner_hook", True)),
+        auto_kaggle_submit=False,
+        feature_flag="night_shift",
+        notes=out.get("notes") or [],
+        reason=out.get("reason"),
+        ascii_board=out.get("ascii_board"),
+    )
+
+
+def _org_runner_key(org_id: str, runner_id: str) -> str:
+    return f"{org_id}:{runner_id}"
+
+
+def _verify_runner_token(client: RunnerClient, token: str | None) -> None:
+    from mymlfw.runner.client import hash_runner_token
+
+    # Fail closed: every registered runner must present a matching token.
+    if client.token_hash is None or not token:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "invalid_runner_token",
+                "message": "Runner token required for this runner_id",
+            },
+        )
+    if hash_runner_token(token) != client.token_hash:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "invalid_runner_token",
+                "message": "Runner token required for this runner_id",
+            },
+        )
+
+
 @router.post("/runners/heartbeat", response_model=RunnerHeartbeatResponse)
 async def runner_heartbeat(
     body: RunnerHeartbeatRequest,
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> RunnerHeartbeatResponse:
-    _ = principal
+    org = _require_org(principal)
     runners = _runners(request.app.state)
-    client = runners.get(body.runner_id)
+    key = _org_runner_key(org.id, body.runner_id)
+    client = runners.get(key)
     if client is None:
-        client = RunnerClient(runner_id=body.runner_id, kind=body.kind)
-        runners[body.runner_id] = client
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "runner_not_registered",
+                "message": "Register via POST /v1/runners/register first",
+            },
+        )
+    _verify_runner_token(client, body.runner_token)
     return client.heartbeat(status=body.status, capability_tags=body.capability_tags)
 
 
@@ -333,16 +840,16 @@ async def runner_claim_job(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> JobClaimResponse:
-    _ = principal
+    org = _require_org(principal)
     runners = _runners(request.app.state)
-    client = runners.get(body.runner_id)
+    key = _org_runner_key(org.id, body.runner_id)
+    client = runners.get(key)
     if client is None:
-        # Empty claim when runner never heartbeated — still return job-token pattern shape.
         return JobClaimResponse(claimed=False, credentials=None)
+    _verify_runner_token(client, body.runner_token)
     claim = client.claim_job(body)
     if claim.claimed and claim.credentials is None:
-        # Should not happen; keep shape stable.
-        return JobClaimResponse(claimed=True, credentials=mint_job_token_stub())
+        return JobClaimResponse(claimed=True, credentials=mint_job_token())
     return claim
 
 
@@ -351,30 +858,48 @@ async def register_local_runner(
     request: Request,
     principal: dict[str, Any] = Depends(get_current_principal),
 ) -> RunnerHeartbeatResponse:
-    _ = principal
+    from mymlfw.runner.client import hash_runner_token
+    from mymlfw.saas.providers.service import mint_short_lived_runner_token
+
+    org = _require_org(principal)
     runner_id = new_runner_id()
-    client = RunnerClient(runner_id=runner_id)
-    _runners(request.app.state)[runner_id] = client
-    return client.heartbeat(status="idle")
-
-
-def train_strip_event_stub(run_id: str | None = None) -> TrainStripEvent:
-    return TrainStripEvent(
-        run_id=run_id or new_run_id(),
-        mode=ResearchRunMode.fold0_smoke,
-        progress_pct=0.0,
-        message="kit train strip idle",
+    raw, token_hash = mint_short_lived_runner_token()
+    client = RunnerClient(
+        runner_id=runner_id,
+        runner_token=raw,
+        token_hash=token_hash or hash_runner_token(raw),
     )
+    _runners(request.app.state)[_org_runner_key(org.id, runner_id)] = client
+    # Unified registry: also surface local runners on /orgs/current/runners.
+    from datetime import UTC, datetime
+
+    from mymlfw.saas.control_plane import get_shared_cloud_store
+    from mymlfw.saas.schemas import RunnerKind, RunnerLifecycleStatus
+
+    now = datetime.now(UTC)
+    get_shared_cloud_store().runners[runner_id] = {
+        "_id": runner_id,
+        "org_id": org.id,
+        "kind": RunnerKind.local.value,
+        "status": RunnerLifecycleStatus.online.value,
+        "provider": None,
+        "region": "",
+        "gpu_type": "",
+        "cost_estimate_micros_hr": 0,
+        "provider_instance_id": None,
+        "idle_timeout_minutes": 30,
+        "last_heartbeat_at": now,
+        "account_id": None,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+        "schema_version": 1,
+        "token_hash": token_hash or hash_runner_token(raw),
+    }
+    hb = client.heartbeat(status="idle")
+    return hb.model_copy(update={"runner_token": raw})
 
 
-def format_sse_train_strip(event: TrainStripEvent, event_id: int = 1) -> str:
-    payload = event.model_dump_json()
-    return f"id: {event_id}\nevent: train_strip\ndata: {payload}\n\n"
-
-
-def sse_hello_and_train_strip() -> list[str]:
+def sse_hello() -> list[str]:
     now = datetime.now(UTC).isoformat()
-    return [
-        f'id: 0\nevent: hello\ndata: {{"ok":true,"ts":"{now}"}}\n\n',
-        format_sse_train_strip(train_strip_event_stub(), event_id=1),
-    ]
+    return [f'id: 0\nevent: hello\ndata: {{"ok":true,"ts":"{now}"}}\n\n']

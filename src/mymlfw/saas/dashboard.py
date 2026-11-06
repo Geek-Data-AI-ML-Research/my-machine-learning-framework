@@ -6,12 +6,22 @@ from typing import Any, Mapping, Sequence
 
 from mymlfw.saas.fold_badges import adv_auc_label, fold_snr_badge
 from mymlfw.saas.schemas import (
+    DashboardBrainPanel,
+    DashboardComputePanel,
+    DashboardDailyProgressPanel,
     DashboardDeadEndsPanel,
+    DashboardEnsemblePanel,
+    DashboardGitPanel,
     DashboardGoalsPanel,
     DashboardHeader,
+    DashboardKagglePanel,
     DashboardLeversPanel,
     DashboardMissionsPanel,
+    DashboardParadigmsPanel,
+    DashboardResearchPanel,
     DashboardResponse,
+    DashboardScoresPanel,
+    DashboardStrategiesPanel,
     FoldSnrBadge,
     GoalStatus,
 )
@@ -122,6 +132,7 @@ def compute_dashboard(
     dead_ends: Sequence[Mapping[str, Any]],
     folds_sha256: str | None = None,
     adv_auc: float | None = None,
+    kaggle: DashboardKagglePanel | None = None,
 ) -> DashboardResponse:
     """Pure aggregate used by API, CLI, and in-memory Demo Campaign."""
     active = sum(1 for g in goals if g.get("status") == GoalStatus.active.value)
@@ -187,12 +198,42 @@ def compute_dashboard(
         for e in list(experiments)[:14]
     ]
 
+    primary_latest = None
+    primary_gap = None
+    if primary is not None:
+        primary_latest = primary.get("best_value")
+        thr = primary.get("threshold")
+        if primary_latest is not None and thr is not None:
+            try:
+                primary_gap = float(thr) - float(primary_latest)
+            except (TypeError, ValueError):
+                primary_gap = None
+
+    best_cvs = [
+        float(e["cv_mean"])
+        for e in experiments
+        if e.get("cv_mean") is not None
+    ]
+    best_cv = max(best_cvs) if best_cvs else None
+    last_scores = [
+        float(e["cv_mean"])
+        for e in list(experiments)[:7]
+        if e.get("cv_mean") is not None
+    ]
+    last_mission_type = None
+    if missions:
+        last_mission_type = str(
+            missions[0].get("mission_type") or missions[0].get("type") or ""
+        ) or None
+
     return DashboardResponse(
         project_id=project_id,
         header=DashboardHeader(
             primary_goal_id=primary.get("_id") or primary.get("id") if primary else None,
             primary_goal_title=primary.get("title") if primary else None,
             primary_threshold=primary.get("threshold") if primary else None,
+            primary_latest=primary_latest,
+            primary_gap=primary_gap,
             primary_status=primary_status,
             progress_pct=pct,
             goals_met_ratio=goals_met_ratio,
@@ -205,6 +246,15 @@ def compute_dashboard(
         goals=DashboardGoalsPanel(
             active=active, met=met, abandoned=abandoned, count=goal_total
         ),
+        scores=DashboardScoresPanel(
+            best_cv=best_cv,
+            best_public=(
+                None
+                if kaggle is None
+                else getattr(kaggle, "public_score", None)
+            ),
+            last_scores=last_scores,
+        ),
         levers=DashboardLeversPanel(
             open=open_n,
             closed=closed_n,
@@ -213,11 +263,17 @@ def compute_dashboard(
             fold_badges=badges[:8],
             sparkline=spark,
         ),
+        ensemble=DashboardEnsemblePanel(),
+        compute=DashboardComputePanel(),
+        paradigms=DashboardParadigmsPanel(),
+        strategies=DashboardStrategiesPanel(),
+        research=DashboardResearchPanel(),
         missions=DashboardMissionsPanel(
             queued=queued,
             running=running,
             succeeded=succeeded,
             failed=failed,
+            last_mission_type=last_mission_type,
         ),
         dead_ends=DashboardDeadEndsPanel(
             count=len(dead_ends),
@@ -225,4 +281,10 @@ def compute_dashboard(
                 str(d.get("variable") or "?") for d in list(dead_ends)[:5]
             ],
         ),
+        daily_progress=DashboardDailyProgressPanel(),
+        kaggle=kaggle
+        if kaggle is not None
+        else DashboardKagglePanel(),
+        git=DashboardGitPanel(),
+        brain=DashboardBrainPanel(),
     )

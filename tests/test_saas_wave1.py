@@ -125,8 +125,6 @@ async def test_idempotency_in_progress_no_cache_5xx():
         assert hits["n"] == 1
 
         # Simulate IN_PROGRESS collision.
-        store.set_in_progress("POST:/v1/probe:k2")
-        # Force overwrite to IN_PROGRESS state (set_in_progress no-ops if exists)
         store._entries["POST:/v1/probe:k2"] = {"status": "IN_PROGRESS"}
         r3 = await client.post(
             "/v1/probe", headers={IDEMPOTENCY_HEADER: "k2"}
@@ -141,7 +139,7 @@ async def test_idempotency_in_progress_no_cache_5xx():
             headers={IDEMPOTENCY_HEADER: "k3", "x-force-500": "1"},
         )
         assert r4.status_code == 500
-        assert store.get("POST:/v1/probe:k3") is None
+        assert await store.get("POST:/v1/probe:k3") is None
 
 
 def test_metric_forbids_nan():

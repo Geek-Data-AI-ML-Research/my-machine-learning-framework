@@ -52,17 +52,98 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
         "project_goals",
         "missions",
         "dead_ends",
+        "project_sources",
+        "project_roadmap_strategies",
         "runs",
         "oof_artifacts",
         "daily_progress",
         "memory_chunks",
+        "autopilot_sessions",
         "autopilot_nodes",
         "project_credits",
         "project_axioms",
         "public_snapshots",
+        "runners",
     ):
         await db[name].create_indexes([_index_model(ESR_TENANT_TIMELINE)])
 
+    # Org-scoped cloud provider accounts (one connected row per provider).
+    await db["cloud_provider_accounts"].create_indexes(
+        [
+            IndexModel(
+                [("org_id", ASCENDING), ("provider", ASCENDING)],
+                name="uniq_org_cloud_provider",
+                unique=True,
+                partialFilterExpression={
+                    "status": "connected",
+                    "deleted_at": None,
+                },
+            ),
+            IndexModel(
+                [("org_id", ASCENDING), ("updated_at", DESCENDING)],
+                name="cloud_accounts_org_timeline",
+            ),
+        ]
+    )
+
+    await db["runners"].create_index(
+        [
+            ("org_id", ASCENDING),
+            ("status", ASCENDING),
+            ("kind", ASCENDING),
+        ],
+        name="runners_org_status_kind",
+        partialFilterExpression={"deleted_at": None},
+    )
+
+    # Parallel R0 updates: distinct nd_ docs keyed by session (no embedded arrays).
+    await db["autopilot_nodes"].create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("project_id", ASCENDING),
+            ("session_id", ASCENDING),
+            ("created_at", ASCENDING),
+        ],
+        name="autopilot_nodes_by_session",
+        partialFilterExpression={"deleted_at": None},
+    )
+    await db["autopilot_sessions"].create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("project_id", ASCENDING),
+            ("status", ASCENDING),
+        ],
+        name="autopilot_sessions_active",
+        partialFilterExpression={
+            "status": {"$in": ["running", "paused"]},
+            "deleted_at": None,
+        },
+    )
+    # At most one running/paused Autopilot session per project (Mongo path).
+    await db["autopilot_sessions"].create_index(
+        [("workspace_id", ASCENDING), ("project_id", ASCENDING)],
+        name="uniq_active_autopilot_session",
+        unique=True,
+        partialFilterExpression={
+            "status": {"$in": ["running", "paused"]},
+            "deleted_at": None,
+        },
+    )
+    # Unified lever/autopilot mutex on projects document.
+    await db["projects"].create_index(
+        [("workspace_id", ASCENDING), ("_id", ASCENDING)],
+        name="projects_tenant_pk",
+        unique=True,
+        partialFilterExpression={"deleted_at": None},
+    )
+    await db["projects"].create_index(
+        [("active_execution_lock.holder_id", ASCENDING)],
+        name="projects_execution_lock_holder",
+        partialFilterExpression={
+            "active_execution_lock": {"$type": "object"},
+            "deleted_at": None,
+        },
+    )
     # Stale pending OOF uploads: query by status + created_at (TTL purge in worker).
     await db["oof_artifacts"].create_index(
         [
@@ -86,6 +167,45 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
         name="mission_queue_lease",
     )
 
+    await db["mcp_gap_reports"].create_indexes(
+        [
+            IndexModel(
+                [("workspace_id", ASCENDING), ("created_at", DESCENDING)],
+                name="mcp_gaps_workspace_timeline",
+                partialFilterExpression={"deleted_at": None},
+            ),
+            IndexModel(
+                [
+                    ("workspace_id", ASCENDING),
+                    ("project_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="mcp_gaps_project_timeline",
+                partialFilterExpression={
+                    "deleted_at": None,
+                    "project_id": {"$type": "string"},
+                },
+            ),
+        ]
+    )
+
+    # MCP PATs — hash lookup + workspace listing (plaintext never stored).
+    await db["agent_pats"].create_indexes(
+        [
+            IndexModel(
+                [("token_hash", ASCENDING)],
+                name="uniq_agent_pat_hash",
+                unique=True,
+                partialFilterExpression={"deleted_at": None},
+            ),
+            IndexModel(
+                [("workspace_id", ASCENDING), ("created_at", DESCENDING)],
+                name="agent_pats_workspace_timeline",
+                partialFilterExpression={"deleted_at": None},
+            ),
+        ]
+    )
+
     await db["public_snapshots"].create_index(
         [("slug", ASCENDING)],
         name="public_snapshots_slug_unique",
@@ -97,9 +217,9 @@ async def ensure_saas_indexes(db: AsyncDatabase) -> None:
         [
             _index_model(OUTBOX_PARTIAL_INDEX),
             IndexModel(
-                [("status", ASCENDING), ("processed_at", ASCENDING)],
+                # TTL indexes must be single-field (Mongo rejects compound + expireAfterSeconds).
+                [("processed_at", ASCENDING)],
                 name="outbox_processed_ttl",
-                # TTL applied when processed_at is set; expireAfterSeconds stub.
                 expireAfterSeconds=7 * 24 * 3600,
                 partialFilterExpression={"status": "processed"},
             ),

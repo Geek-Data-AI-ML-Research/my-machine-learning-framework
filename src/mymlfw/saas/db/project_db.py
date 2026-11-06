@@ -80,6 +80,14 @@ class ProjectScopedDB:
         return self._scoped("dead_ends")
 
     @property
+    def sources(self) -> ScopedCollection:
+        return self._scoped("project_sources")
+
+    @property
+    def roadmap_strategies(self) -> ScopedCollection:
+        return self._scoped("project_roadmap_strategies")
+
+    @property
     def runs(self) -> ScopedCollection:
         return self._scoped("runs")
 
@@ -92,12 +100,134 @@ class ProjectScopedDB:
         return self._scoped("memory_chunks")
 
     @property
+    def autopilot_sessions(self) -> ScopedCollection:
+        """Parent ``aps_`` scalars only — never embed ``nodes[]`` arrays."""
+        return self._scoped("autopilot_sessions")
+
+    @property
     def autopilot_nodes(self) -> ScopedCollection:
+        """Separate ``nd_`` probes keyed ``(workspace_id, project_id, session_id)``."""
         return self._scoped("autopilot_nodes")
 
     @property
     def project_credits(self) -> ScopedCollection:
         return self._scoped("project_credits")
+
+    async def list_credit_docs(self) -> list[dict[str, Any]]:
+        cursor = self.project_credits.find({})
+        return [doc async for doc in cursor]
+
+    async def get_credit_by_key(self, identifier_key: str) -> dict[str, Any] | None:
+        return await self.project_credits.find_one({"identifier_key": identifier_key})
+
+    async def get_license_policy(self) -> dict[str, Any] | None:
+        """``projects.license_policy`` subdocument (Phase D), if set."""
+        doc = await self._db["projects"].find_one(
+            {
+                "_id": self.project_id,
+                "workspace_id": self.workspace_id,
+                "deleted_at": None,
+            },
+            {"license_policy": 1},
+        )
+        return (doc or {}).get("license_policy")
+
+    async def set_license_policy(self, policy: dict[str, Any]) -> bool:
+        res = await self._db["projects"].update_one(
+            {
+                "_id": self.project_id,
+                "workspace_id": self.workspace_id,
+                "deleted_at": None,
+            },
+            {
+                "$set": {
+                    "license_policy": dict(policy),
+                    "updated_at": datetime.now(UTC),
+                }
+            },
+        )
+        return res.matched_count > 0
+
+    async def enqueue_outbox(
+        self, *, event_type: str, payload: dict[str, Any]
+    ) -> str:
+        """Tenant-stamped outbox event (side effects run in the worker)."""
+        return await enqueue_outbox_event(
+            self._db,
+            event_type=event_type,
+            payload=payload,
+            workspace_id=self.workspace_id,
+            project_id=self.project_id,
+        )
+
+    async def acquire_execution_lock(
+        self,
+        *,
+        holder_type: str,
+        holder_id: str,
+        expires_at: datetime,
+    ) -> ExecutionLock:
+        """Atomically set ``projects.active_execution_lock`` if free or expired."""
+        now = datetime.now(UTC)
+        filt: dict[str, Any] = {
+            "_id": self.project_id,
+            "workspace_id": self.workspace_id,
+            "deleted_at": None,
+            "$or": [
+                {"active_execution_lock": None},
+                {"active_execution_lock": {"$exists": False}},
+                {"active_execution_lock.expires_at": {"$lte": now}},
+            ],
+        }
+        lock_doc = {
+            "holder_type": holder_type,
+            "holder_id": holder_id,
+            "expires_at": expires_at,
+        }
+        doc = await self._db["projects"].find_one_and_update(
+            filt,
+            {
+                "$set": {
+                    "active_execution_lock": lock_doc,
+                    "updated_at": now,
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if doc is None:
+            existing = await self._db["projects"].find_one(
+                {"_id": self.project_id, "workspace_id": self.workspace_id}
+            )
+            held = (existing or {}).get("active_execution_lock") or {}
+            raise RuntimeError(
+                f"execution_lock_held:{held.get('holder_type')}:{held.get('holder_id')}"
+            )
+        return ExecutionLock(
+            holder_type=holder_type,
+            holder_id=holder_id,
+            expires_at=expires_at,
+        )
+
+    async def release_execution_lock(
+        self,
+        *,
+        holder_type: str,
+        holder_id: str,
+    ) -> bool:
+        """Clear lock only when still held by the same holder (fencing)."""
+        now = datetime.now(UTC)
+        doc = await self._db["projects"].find_one_and_update(
+            {
+                "_id": self.project_id,
+                "workspace_id": self.workspace_id,
+                "active_execution_lock.holder_type": holder_type,
+                "active_execution_lock.holder_id": holder_id,
+                "deleted_at": None,
+            },
+            {"$set": {"active_execution_lock": None, "updated_at": now}},
+            return_document=ReturnDocument.AFTER,
+        )
+        return doc is not None
 
     @property
     def axioms(self) -> ScopedCollection:
@@ -198,56 +328,111 @@ class ProjectScopedDB:
         client = self._db.client
 
         async def _txn(session: Any) -> dict[str, Any]:
-            async with session.bind(end_session=False):
-                coll = self._db["missions"]
-                doc = await coll.find_one_and_update(
+            # Pass session= explicitly. Do NOT use session.bind() inside
+            # with_transaction: with client w=majority, bind causes
+            # OperationFailure "writeConcern is not allowed within a
+            # multi-statement transaction" on Atlas Local / Mongo 8.
+            coll = self._db["missions"]
+            doc = await coll.find_one_and_update(
+                {
+                    **self._mission_tenant_base(),
+                    "_id": mission_id,
+                    "status": "leased",
+                    "attempt_count": attempt_count,
+                },
+                {
+                    "$set": {
+                        "status": status,
+                        "outcome": normalized_outcome,
+                        "fold_scores": scores,
+                        "completion_notes": notes,
+                        "lease_expires_at": now,
+                        "updated_at": now,
+                    }
+                },
+                session=session,
+                return_document=ReturnDocument.AFTER,
+            )
+            if doc is None:
+                existing = await coll.find_one(
                     {
                         **self._mission_tenant_base(),
                         "_id": mission_id,
-                        "status": "leased",
-                        "attempt_count": attempt_count,
                     },
-                    {
-                        "$set": {
-                            "status": status,
-                            "outcome": normalized_outcome,
-                            "fold_scores": scores,
-                            "completion_notes": notes,
-                            "lease_expires_at": now,
-                            "updated_at": now,
-                        }
-                    },
-                    return_document=ReturnDocument.AFTER,
+                    session=session,
                 )
-                if doc is None:
-                    existing = await coll.find_one(
-                        {
-                            **self._mission_tenant_base(),
-                            "_id": mission_id,
-                        }
-                    )
-                    if existing is None:
-                        raise MissionNotFoundError(mission_id=mission_id)
-                    raise StaleLeaseError(
-                        mission_id=mission_id,
-                        expected=existing.get("attempt_count"),
-                    )
-                await enqueue_outbox_event(
-                    self._db,
-                    event_type="mission.completed",
-                    payload={
-                        "mission_id": mission_id,
-                        "outcome": normalized_outcome,
-                        "attempt_count": attempt_count,
-                        "status": status,
-                    },
-                    workspace_id=self.workspace_id,
-                    project_id=self.project_id,
+                if existing is None:
+                    raise MissionNotFoundError(mission_id=mission_id)
+                raise StaleLeaseError(
+                    mission_id=mission_id,
+                    expected=existing.get("attempt_count"),
                 )
-                return doc
+            await enqueue_outbox_event(
+                self._db,
+                event_type="mission.completed",
+                payload={
+                    "mission_id": mission_id,
+                    "outcome": normalized_outcome,
+                    "attempt_count": attempt_count,
+                    "status": status,
+                },
+                workspace_id=self.workspace_id,
+                project_id=self.project_id,
+                session=session,
+            )
+            cited = list(doc.get("cited_memory_ids") or [])
+            if cited:
+                await self.update_cited_memory_utility(
+                    cited_ids=cited,
+                    outcome=normalized_outcome,
+                    session=session,
+                )
+            return doc
 
         async with client.start_session() as session:
             return await session.with_transaction(_txn)
+
+    async def update_cited_memory_utility(
+        self,
+        *,
+        cited_ids: list[str],
+        outcome: str,
+        session: Any | None = None,
+    ) -> int:
+        """Bandit loop: boost/penalize cited dead_ends + episode memory docs."""
+        from mymlfw.saas.rag.utility import update_cited_memory_utility as _update
+
+        if not cited_ids:
+            return 0
+        touched = 0
+        for coll_name in ("dead_ends", "episode_cards"):
+            cursor = self._db[coll_name].find(
+                {
+                    "workspace_id": self.workspace_id,
+                    "project_id": self.project_id,
+                    "_id": {"$in": cited_ids},
+                    "deleted_at": None,
+                },
+                session=session,
+            )
+            docs = [doc async for doc in cursor]
+            changed = _update(docs, cited_ids=cited_ids, outcome=outcome)
+            for doc in docs:
+                if str(doc.get("_id")) not in changed:
+                    continue
+                await self._db[coll_name].update_one(
+                    {"_id": doc["_id"]},
+                    {
+                        "$set": {
+                            "utility_weight": doc.get("utility_weight"),
+                            "times_cited": doc.get("times_cited"),
+                            "falsified_on_cv": doc.get("falsified_on_cv", False),
+                        }
+                    },
+                    session=session,
+                )
+                touched += 1
+        return touched
 
     async def complete_mission_stub(
         self,

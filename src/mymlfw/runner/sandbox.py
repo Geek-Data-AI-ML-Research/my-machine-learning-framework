@@ -8,6 +8,10 @@ SANDBOX_NOTES: tuple[str, ...] = (
     "verify_public_notebook jobs require --network none; never run on local IDE agents.",
     "Heartbeat at least every 30s while a job is active; idle runners self-stop on timeout.",
     "Job token TTL is 2h; re-claim for a fresh token rather than extending.",
+    "Dead-man: if API unreachable and idle past idle_timeout_minutes, self-stop "
+    "(EC2 terminate-on-shutdown / RunPod stop hook).",
+    "AWS Spot: poll instance-action every 5s; on 2m notice checkpoint + requeue "
+    "without infra strike.",
 )
 
 

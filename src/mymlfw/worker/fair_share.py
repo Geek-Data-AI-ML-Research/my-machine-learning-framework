@@ -1,14 +1,16 @@
-"""Fair-share job queue stub (per-org concurrency from entitlements).
+"""Fair-share job queue (per-org concurrency from entitlements).
 
 Round-robin across orgs that have pending work so one tenant cannot starve
-others. Real Redis/Mongo claim + runner dispatch lands with cloud track.
+others. Runner ``auto`` picker prefers ready local, else cheapest cloud GPU.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Callable
+
+from mymlfw.saas.providers.service import pick_runner_auto
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,8 @@ class FairShareQueue:
     _running_by_org: dict[str, int] = field(default_factory=dict)
     _rr_order: list[str] = field(default_factory=list)
     _rr_index: int = 0
+    # Optional hook: org_id -> list of runner dicts for job runner=auto
+    runners_for_org: Callable[[str], list[dict[str, Any]]] | None = None
 
     def enqueue(self, *, org_id: str, job: dict[str, Any]) -> None:
         if org_id not in self._pending:
@@ -60,8 +64,20 @@ class FairShareQueue:
             self._running_by_org[org_id] = self._running_by_org.get(org_id, 0) + 1
             job["claimed_at"] = datetime.now(UTC).isoformat()
             job["org_id"] = org_id
+            if str(job.get("runner") or job.get("runner_id") or "auto") == "auto":
+                picked = self.pick_runner(org_id)
+                if picked is not None:
+                    job["runner_id"] = picked.get("runner_id") or picked.get("_id")
+                    job["runner_kind"] = picked.get("kind")
+                    job["runner_pick"] = "auto"
             return job
         return None
+
+    def pick_runner(self, org_id: str) -> dict[str, Any] | None:
+        """Job ``auto`` picker hook: local ready → cheapest fitting cloud GPU."""
+        if self.runners_for_org is None:
+            return None
+        return pick_runner_auto(self.runners_for_org(org_id))
 
     def complete(self, org_id: str) -> None:
         cur = self._running_by_org.get(org_id, 0)

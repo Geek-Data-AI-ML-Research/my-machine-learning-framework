@@ -30,7 +30,7 @@ def runner_start(
     poll_seconds: float = 5.0,
     env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Heartbeat loop stub. ``once`` returns after a single heartbeat+claim."""
+    """Heartbeat until interrupted. ``once`` returns after a single claim."""
     try:
         validate_runner_env(env)
     except RunnerEnvError as exc:
@@ -46,15 +46,14 @@ def runner_start(
         "runner_id": client.runner_id,
         "heartbeat": hb.model_dump(mode="json"),
         "claim": claim.model_dump(mode="json"),
-        "mode": "once" if once else "loop_stub",
+        "mode": "once" if once else "loop",
     }
     if once:
         return result
-    # Stub loop: one more heartbeat then exit (real daemon lands with worker image).
-    time.sleep(min(poll_seconds, 0.01))
-    client.heartbeat(status="idle")
-    result["stopped"] = "loop_stub_exit"
-    return result
+    while True:
+        time.sleep(poll_seconds)
+        client.heartbeat(status="idle")
+        client.claim_job()
 
 
 def print_json(payload: dict[str, Any]) -> None:

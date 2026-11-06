@@ -164,7 +164,7 @@ def test_research_modes_and_error_slices_shape():
     run = svc.create_run(ResearchRunCreateRequest(mode=ResearchRunMode.fold0_smoke))
     assert run.mode == ResearchRunMode.fold0_smoke
     resource = svc.get_error_slices(run.run_id)
-    assert resource.status == "not_ready"
+    assert resource.status == "empty"
     assert resource.slices == []
 
     filled = svc.set_error_slices_stub(
@@ -213,15 +213,23 @@ def test_notebook_chunker_hypothesis_code_output_units():
     assert "class:Model" in units[1].ast_tags
 
 
-def test_ensemble_ready_and_cloud_provider_hooks_are_stubs():
-    from mymlfw.saas.autopilot import start_autopilot_stub
+def test_ensemble_ready_and_autopilot_feature_flag():
+    from mymlfw.saas.autopilot import FEATURE_FLAG, reset_autopilot_store, start_autopilot
     from mymlfw.saas.ensemble import plan_ensemble
     from mymlfw.saas.providers import connect_provider_stub
 
     plan = plan_ensemble(["oof_1", "oof_2"], mode="auto")
     assert plan["status"] == "ready"
     assert plan["mode"] == "auto"
-    assert start_autopilot_stub()["feature_flag"] == "night_shift"
+    reset_autopilot_store()
+    started = start_autopilot(
+        workspace_id="org_byoc",
+        project_id="prj_byoc_ap",
+        night_shift_enabled=True,
+        max_probes=2,
+    )
+    assert started["feature_flag"] == FEATURE_FLAG == "night_shift"
+    assert started["auto_kaggle_submit"] is False
     assert connect_provider_stub("runpod")["feature_flag"] == "cloud_runners"
 
 
@@ -243,7 +251,7 @@ async def test_phase_c_api_oof_and_sse_train_strip():
     AUTH_STORE.sessions.clear()
     AUTH_STORE.personas.clear()
 
-    app = create_app(Settings(mongo_uri="", env="dev"))
+    app = create_app(Settings(mongo_uri="", redis_url="", env="dev"))
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         reg = await client.post(
@@ -256,12 +264,12 @@ async def test_phase_c_api_oof_and_sse_train_strip():
         )
         assert reg.status_code == 200
         token = reg.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        auth = {"Authorization": f"Bearer {token}"}
 
         payload = b"npz-bytes"
         create = await client.post(
             "/v1/projects/prj_01HTESTPROJECT000000000000/oof-artifacts",
-            headers=headers,
+            headers={**auth, "Idempotency-Key": "byoc-oof-1"},
             json={
                 "experiment_id": "exp_01HTESTEXPERIMENT00000000000",
                 "content_length": len(payload),
@@ -282,7 +290,7 @@ async def test_phase_c_api_oof_and_sse_train_strip():
 
         confirm = await client.post(
             f"/v1/projects/prj_01HTESTPROJECT000000000000/oof-artifacts/{oof_id}/confirm",
-            headers=headers,
+            headers={**auth, "Idempotency-Key": "byoc-confirm-1"},
             json={},
         )
         assert confirm.status_code == 200, confirm.text
@@ -290,12 +298,13 @@ async def test_phase_c_api_oof_and_sse_train_strip():
 
         run = await client.post(
             "/v1/projects/prj_01HTESTPROJECT000000000000/research-runs",
-            headers=headers,
+            headers={**auth, "Idempotency-Key": "byoc-run-1"},
             json={"mode": "fold0_smoke"},
         )
         assert run.status_code == 200
         assert run.json()["mode"] == "fold0_smoke"
 
-        events = await client.get("/v1/events", headers=headers)
+        events = await client.get("/v1/events", headers=auth)
         assert events.status_code == 200
-        assert "train_strip" in events.text
+        assert "event: hello" in events.text
+        assert "train_strip" not in events.text

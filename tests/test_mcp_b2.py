@@ -152,9 +152,54 @@ async def test_dashboard_list_projects_and_brain_stub(brain, missions, pats):
         missions=missions,
         pats=pats,
         pat=minted.token,
+        query="dropout dead end",
     )
-    assert brain_q["status"] == "not_ready"
-    assert brain_q["results"] == []
+    assert brain_q["status"] in {"ready", "empty"}
+    assert isinstance(brain_q["results"], list)
+
+
+@pytest.mark.asyncio
+async def test_mcp_roadmap_add_list_update(brain, pats):
+    from mymlfw.mcp import tools as mcp_tools
+
+    org = "org_01HTESTWORKSPACE0000000000"
+    summary = brain.ensure_demo_campaign(org_id=org, org_slug="demo")
+    minted = pats.create(workspace_id=org)
+
+    created = await mcp_tools.tool_add_roadmap_strategy(
+        project_id=summary.id,
+        title="Stage 1 — split discovery",
+        plan="Adversarial + chronology; lock StratifiedKFold if Adv≈0.50.",
+        pats=pats,
+        brain=brain,
+        pat=minted.token,
+        idempotency_key="roadmap-add-1",
+        priority=20,
+        status="in_progress",
+    )
+    assert created.get("error_code") is None, created
+    assert created["title"].startswith("Stage 1")
+    assert created["status"] == "in_progress"
+    sid = created["id"]
+
+    listing = await mcp_tools.tool_list_roadmap(
+        project_id=summary.id, pats=pats, brain=brain, pat=minted.token
+    )
+    assert any(s["id"] == sid for s in listing["strategies"])
+
+    done = await mcp_tools.tool_update_roadmap_strategy(
+        project_id=summary.id,
+        strategy_id=sid,
+        pats=pats,
+        brain=brain,
+        pat=minted.token,
+        idempotency_key="roadmap-done-1",
+        status="executed",
+        result="Adv AUC ~0.50; locked StratifiedKFold(5).",
+        result_metric=0.50,
+    )
+    assert done["status"] == "executed"
+    assert done["result_metric"] == 0.50
 
 
 @pytest.mark.asyncio
@@ -260,7 +305,7 @@ def test_mcp_package_has_no_mongo_markers():
     assert (root / "src/mymlfw/mcp/server.py").exists()
 
 
-def test_build_mcp_server_registers_b2_tools():
+def test_build_mcp_server_registers_b2_and_cloud_tools():
     pytest.importorskip("mcp")
     from mymlfw.mcp.server import build_mcp_server
     from mymlfw.saas.brain_store import CampaignBrainStore
@@ -271,7 +316,6 @@ def test_build_mcp_server_registers_b2_tools():
     missions = MissionService(brain=brain)
     pats = PatStore()
     server = build_mcp_server(missions=missions, pats=pats)
-    # Tool registry is populated at decoration time.
     tool_names = {t.name for t in server._tool_manager.list_tools()}
     for required in (
         "get_next_mission",
@@ -280,5 +324,35 @@ def test_build_mcp_server_registers_b2_tools():
         "list_projects",
         "report_mission_progress",
         "query_project_brain",
+        "advise_project",
+        "list_org_runners",
+        "list_cloud_accounts",
+        "connect_cloud_provider",
+        "disconnect_cloud_provider",
+        "list_cloud_gpus",
+        "quote_cloud_launch",
+        "launch_cloud_runner",
+        "stop_cloud_runner",
     ):
-        assert required in tool_names
+        assert required in tool_names, required
+
+
+@pytest.mark.asyncio
+async def test_mcp_auth_error_envelope_and_idempotency_required(missions, pats):
+    from mymlfw.mcp import tools as mcp_tools
+
+    missing = await mcp_tools.tool_list_projects(missions=missions, pats=pats)
+    assert missing["error_code"] == "invalid_or_missing_pat"
+    assert "suggested_fix" in missing
+
+    minted = pats.create(
+        workspace_id="org_01HTESTWORKSPACE0000000000",
+        scopes=["mcp:worker"],
+    )
+    no_key = await mcp_tools.tool_get_next_mission(
+        project_id="prj_01HTESTPROJECT000000000000",
+        missions=missions,
+        pats=pats,
+        pat=minted.token,
+    )
+    assert no_key["error_code"] == "idempotency_key_required"

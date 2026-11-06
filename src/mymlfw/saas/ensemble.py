@@ -168,14 +168,32 @@ def maybe_subsample_indices(
     target_n = min(target_n, n)
     folds_i = np.asarray(folds, dtype=np.int64)
     rng = rng or np.random.default_rng(0)
-    picked: list[int] = []
     unique = np.unique(folds_i)
-    per_fold = max(target_n // max(len(unique), 1), 1)
+    # Guarantee ≥1 row per fold first so nested CV never sees empty held-out folds.
+    picked: list[int] = []
     for f in unique:
         ix = np.flatnonzero(folds_i == f)
-        take = min(len(ix), per_fold)
-        chosen = rng.choice(ix, size=take, replace=False)
-        picked.extend(int(i) for i in chosen.tolist())
+        if len(ix) == 0:
+            continue
+        picked.append(int(rng.choice(ix, size=1, replace=False)[0]))
+    remaining_budget = max(target_n - len(picked), 0)
+    if remaining_budget > 0:
+        per_fold = max(remaining_budget // max(len(unique), 1), 0)
+        for f in unique:
+            if remaining_budget <= 0:
+                break
+            ix = np.flatnonzero(folds_i == f)
+            already = set(picked)
+            avail = [int(i) for i in ix.tolist() if int(i) not in already]
+            if not avail:
+                continue
+            take = min(len(avail), max(per_fold, 1), remaining_budget)
+            if take <= 0:
+                continue
+            chosen = rng.choice(np.asarray(avail, dtype=np.int64), size=take, replace=False)
+            for i in chosen.tolist():
+                picked.append(int(i))
+                remaining_budget -= 1
     if len(picked) < target_n:
         remaining = np.setdiff1d(np.arange(n), np.asarray(picked, dtype=np.int64))
         extra = min(len(remaining), target_n - len(picked))
@@ -183,7 +201,16 @@ def maybe_subsample_indices(
             picked.extend(
                 int(i) for i in rng.choice(remaining, size=extra, replace=False).tolist()
             )
-    return np.asarray(sorted(picked), dtype=np.int64), hint
+    indices = np.asarray(sorted(set(picked)), dtype=np.int64)
+    kept = set(int(x) for x in np.unique(folds_i[indices]).tolist())
+    missing = [int(f) for f in unique.tolist() if int(f) not in kept]
+    if missing:
+        raise EnsembleError(
+            "subsample_empty_fold",
+            "Fold-stratified subsample dropped fold(s); refuse nested CV.",
+            missing_folds=missing,
+        )
+    return indices, hint
 
 
 def validate_oof_alignment(
@@ -895,11 +922,14 @@ def promote_blend_to_experiment(
     parent_experiment_ids: Sequence[str] | None = None,
     nested_cv_score: float | None = None,
     fold_scores: Sequence[float] | None = None,
+    artifact_repo: Any | None = None,
+    require_ready_oofs: bool = True,
 ) -> dict[str, Any]:
-    """Stub: build an ``ensemble_blend`` experiment lineage record (no MinIO yet).
+    """Build an ``ensemble_blend`` experiment lineage record.
 
-    Writes parent OOF artifact ids and weights into a draft experiment document.
-    Full parquet upload + Mongo insert lands when artifact promote is wired.
+    When ``artifact_repo`` is provided (or the process default is set), parent
+    OOF ids must exist, belong to ``project_id``, and be ``ready`` before
+    promote — client-supplied scores alone are never trusted as lineage proof.
     """
     if len(parent_oof_ids) < 2:
         raise EnsembleError(
@@ -910,6 +940,12 @@ def promote_blend_to_experiment(
         raise EnsembleError(
             "weight_length_mismatch",
             "weights length must match parent_oof_ids.",
+        )
+    if require_ready_oofs:
+        _assert_parent_oofs_ready(
+            parent_oof_ids,
+            project_id=project_id,
+            artifact_repo=artifact_repo,
         )
     exp_id = new_experiment_id()
     draft = {
@@ -927,9 +963,10 @@ def promote_blend_to_experiment(
         "status": "open",
         "band_low": 0.0,
         "band_high": 0.05,
+        "lineage_verified": bool(require_ready_oofs and artifact_repo is not None),
     }
     return {
-        "status": "stub",
+        "status": "created",
         "experiment_id": exp_id,
         "strategy": "ensemble_blend",
         "parent_oof_ids": list(parent_oof_ids),
@@ -937,10 +974,56 @@ def promote_blend_to_experiment(
         "mode": mode,
         "experiment": draft,
         "detail": (
-            "Lineage draft created; blended OOF/test parquet → MinIO and "
-            "experiments insert land when artifact promote is wired."
+            "Lineage verified against ready OOF artifacts."
+            if draft["lineage_verified"]
+            else (
+                "Lineage draft created; blended OOF/test parquet → MinIO and "
+                "experiments insert land when artifact promote is wired."
+            )
         ),
     }
+
+
+def _assert_parent_oofs_ready(
+    parent_oof_ids: Sequence[str],
+    *,
+    project_id: str,
+    artifact_repo: Any | None,
+) -> None:
+    """Refuse promote when OOF artifacts are missing, wrong project, or not ready."""
+    if artifact_repo is None:
+        # No artifact surface in this process — refuse forged promote by default.
+        raise EnsembleError(
+            "oof_lineage_unverified",
+            "Promote requires a ready OOF artifact repo for parent_oof_ids.",
+            parent_oof_ids=list(parent_oof_ids),
+        )
+    for oof_id in parent_oof_ids:
+        doc = None
+        if hasattr(artifact_repo, "get"):
+            doc = artifact_repo.get(oof_id)
+        elif hasattr(artifact_repo, "repo") and hasattr(artifact_repo.repo, "get"):
+            doc = artifact_repo.repo.get(oof_id)
+        if doc is None:
+            raise EnsembleError(
+                "oof_not_found",
+                f"Unknown parent OOF id {oof_id}.",
+                oof_id=oof_id,
+            )
+        if str(doc.get("project_id") or "") != str(project_id):
+            raise EnsembleError(
+                "oof_wrong_project",
+                f"OOF {oof_id} does not belong to project {project_id}.",
+                oof_id=oof_id,
+            )
+        status = str(doc.get("status") or "")
+        if status != "ready":
+            raise EnsembleError(
+                "oof_not_ready",
+                f"OOF {oof_id} status={status}; confirm HEAD before promote.",
+                oof_id=oof_id,
+                status=status,
+            )
 
 
 def promote_blend_to_experiment_stub(*args: Any, **kwargs: Any) -> dict[str, Any]:

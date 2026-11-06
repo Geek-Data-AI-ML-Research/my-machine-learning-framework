@@ -20,7 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6379"
     networks:
       - control_plane_internal
     healthcheck:
@@ -30,7 +30,8 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Docker Hub minio/minio removed; Silo is an S3-compatible MinIO fork for local Compose.
+    image: pgsty/silo:latest
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: mymlfw
@@ -40,12 +41,25 @@ services:
       - "127.0.0.1:9001:9001"
     networks:
       - control_plane_internal
-    # Image may lack curl/mc; Wave 1 does not gate on MinIO readiness.
     healthcheck:
-      test: ["CMD", "kill", "-0", "1"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 8
+      start_period: 10s
+
+  minio-init:
+    image: pgsty/silo:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 mymlfw mymlfwsecret &&
+      mc mb --ignore-existing local/mymlfw
+      "
+    networks:
+      - control_plane_internal
 
   api:
     build:
@@ -57,14 +71,32 @@ services:
       MYMLFW_MONGO_DB: mymlfw
       MYMLFW_REDIS_URL: redis://redis:6379/0
       MYMLFW_GITHUB_OAUTH_STUB: "true"
-      MYMLFW_CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:3000
+      MYMLFW_CORS_ORIGINS: http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5175,http://localhost:5175,http://127.0.0.1:3000
+      MYMLFW_MINIO_ENDPOINT: http://minio:9000
+      MYMLFW_MINIO_LIVE: "1"
+      MYMLFW_MINIO_BUCKET: mymlfw
+      MYMLFW_MINIO_ACCESS_KEY: mymlfw
+      MYMLFW_MINIO_SECRET_KEY: mymlfwsecret
+      MYMLFW_CLOUD_MOCK: "0"
+      # Kaggle Public API (https://www.kaggle.com/docs/api). Prefer KGAT_ bearer.
+      KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
+      MYMLFW_KAGGLE_API_TOKEN: ${MYMLFW_KAGGLE_API_TOKEN:-${KAGGLE_API_TOKEN:-}}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+      MYMLFW_KAGGLE_DATA_DIR: /data/kaggle
+    volumes:
+      - kaggle_data:/data/kaggle
+      # Optional host token file (read-only). Create empty dir if missing.
+      - ${HOME}/.kaggle:/root/.kaggle:ro
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - control_plane_internal
       - edge
@@ -75,17 +107,102 @@ services:
       retries: 12
       start_period: 20s
 
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    command: ["python", "-m", "mymlfw.worker.main"]
+    environment:
+      MYMLFW_ENV: dev
+      MYMLFW_MONGO_URI: mongodb://mongodb:27017/?directConnection=true
+      MYMLFW_MONGO_DB: mymlfw
+      MYMLFW_CLOUD_MOCK: "0"
+      MYMLFW_CLOUD_RUNNERS: "1"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - control_plane_internal
+    restart: "no"
+
   web:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
     ports:
-      - "127.0.0.1:5173:80"
+      - "127.0.0.1:5175:80"
     depends_on:
       api:
         condition: service_healthy
     networks:
       - edge
+
+  mcp:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    # Bind 0.0.0.0 inside the container so Docker port publish reaches the process.
+    # Host publish stays loopback-only (127.0.0.1:8100) — never 0.0.0.0 on the host.
+    command:
+      [
+        "python",
+        "-m",
+        "mymlfw.mcp",
+        "--transport",
+        "streamable-http",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8100",
+      ]
+    environment:
+      MYMLFW_ENV: dev
+      MYMLFW_MONGO_URI: mongodb://mongodb:27017/?directConnection=true
+      MYMLFW_MONGO_DB: mymlfw
+      MYMLFW_REDIS_URL: redis://redis:6379/0
+      MYMLFW_CLOUD_MOCK: "0"
+    ports:
+      - "127.0.0.1:8100:8100"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.create_connection(('127.0.0.1',8100),2); s.close()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - control_plane_internal
+      # edge required so host publish 127.0.0.1:8100 reaches the container
+      # (internal-only networks leave PortBindings empty on Docker Desktop).
+      - edge
+
+  runner:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    command: ["python", "-m", "mymlfw.runner"]
+    environment:
+      MYMLFW_API: http://api:8000
+    networks:
+      - control_plane_internal
+    restart: "no"
+
+volumes:
+  kaggle_data:
 
 networks:
   control_plane_internal:

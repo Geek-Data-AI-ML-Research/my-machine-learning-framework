@@ -36,8 +36,9 @@ def _utcnow() -> datetime:
 class CampaignBrainStore:
     """Org-scoped projects / goals / experiments / dead_ends for Phase B.
 
-    Mongo ``ProjectScopedDB`` is preferred when the API has a live client;
-    this store keeps unit tests and Compose-without-mongo working.
+    Production path when ``MYMLFW_MONGO_URI`` is set: Mongo via
+    ``saas.db.project_data`` / ``ProjectScopedDB``. This in-memory store is
+    only for unit tests and when Mongo is unset.
     """
 
     def __init__(self) -> None:
@@ -47,6 +48,10 @@ class CampaignBrainStore:
         self.experiments: dict[str, list[dict[str, Any]]] = {}
         self.missions: dict[str, list[dict[str, Any]]] = {}
         self.dead_ends: dict[str, list[dict[str, Any]]] = {}
+        self.sources: dict[str, list[dict[str, Any]]] = {}
+        self.roadmap_strategies: dict[str, list[dict[str, Any]]] = {}
+        self.progress: dict[str, list[dict[str, Any]]] = {}
+        self.members: dict[str, list[dict[str, Any]]] = {}
         self.snapshots: dict[str, dict[str, Any]] = {}  # full slug -> doc
         self.axioms: dict[str, list[dict[str, Any]]] = {}
         self.episode_cards: dict[str, list[dict[str, Any]]] = {}
@@ -249,6 +254,395 @@ class CampaignBrainStore:
             if self.projects[pid].get("deleted_at") is None
         ]
 
+    def ensure_org_project(
+        self,
+        org_id: str,
+        project_id: str,
+        *,
+        name: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Upsert a project under ``org_id``. Returns None if id is owned by another org."""
+        existing = self.projects.get(project_id)
+        if existing is not None:
+            if existing.get("workspace_id") != org_id:
+                return None
+            return existing
+        if not str(project_id).startswith("prj_"):
+            return None
+        now = _utcnow()
+        project = {
+            "_id": project_id,
+            "workspace_id": org_id,
+            "project_id": project_id,
+            "schema_version": 1,
+            "slug": (name or project_id)[:48].lower().replace(" ", "-"),
+            "name": name or project_id,
+            "kind": ProjectKind.standalone.value,
+            "is_demo": False,
+            "epoch_id": "epoch_0",
+            "folds_sha256": secrets.token_hex(32),
+            "adv_auc": None,
+            "n_folds": 5,
+            "folds_artifact_key": f"projects/{project_id}/folds.parquet",
+            "public_share_slug": None,
+            "created_at": now,
+            "updated_at": now,
+            "deleted_at": None,
+        }
+        self.projects[project_id] = project
+        self.by_org.setdefault(org_id, []).append(project_id)
+        self.goals.setdefault(project_id, [])
+        self.experiments.setdefault(project_id, [])
+        self.missions.setdefault(project_id, [])
+        self.dead_ends.setdefault(project_id, [])
+        self.progress.setdefault(project_id, [])
+        self.members.setdefault(project_id, [])
+        return project
+
+    def create_project(self, org_id: str, body: Any) -> ProjectSummary:
+        from mymlfw.saas.studio import memory_create_project
+
+        return memory_create_project(self, org_id=org_id, body=body)
+
+    def archive_project(self, org_id: str, project_id: str) -> Any:
+        from mymlfw.saas.studio import memory_archive_project
+
+        return memory_archive_project(self, org_id=org_id, project_id=project_id)
+
+    def invite_member(
+        self, org_id: str, project_id: str, body: Any, *, user_id: str | None = None
+    ) -> Any:
+        from mymlfw.saas.studio import memory_invite
+
+        return memory_invite(
+            self, org_id=org_id, project_id=project_id, body=body, user_id=user_id
+        )
+
+    def list_members(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import member_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        return [
+            member_from_doc(doc) for doc in self.members.get(project_id, [])
+        ]
+
+    def list_goals(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import goal_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        return [goal_from_doc(g) for g in self.goals.get(project_id, [])]
+
+    def add_goal(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import build_goal_doc, goal_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        doc = build_goal_doc(
+            workspace_id=org_id, project_id=project_id, body=body
+        )
+        self.goals.setdefault(project_id, []).append(doc)
+        return goal_from_doc(doc)
+
+    def update_goal(
+        self, org_id: str, project_id: str, goal_id: str, body: Any
+    ) -> Any:
+        from mymlfw.saas.studio import apply_goal_update, goal_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        for goal in self.goals.get(project_id, []):
+            if goal.get("_id") == goal_id or goal.get("id") == goal_id:
+                apply_goal_update(goal, body)
+                return goal_from_doc(goal)
+        raise KeyError("goal_not_found")
+
+    def list_progress(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import progress_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        notes = sorted(
+            self.progress.get(project_id, []),
+            key=lambda d: d.get("created_at") or _utcnow(),
+            reverse=True,
+        )
+        return [progress_from_doc(n) for n in notes]
+
+    def add_progress(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import build_progress_doc, progress_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        doc = build_progress_doc(
+            workspace_id=org_id, project_id=project_id, body=body
+        )
+        self.progress.setdefault(project_id, []).append(doc)
+        return progress_from_doc(doc)
+
+    def list_dead_ends(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import dead_end_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        return [dead_end_from_doc(d) for d in self.dead_ends.get(project_id, [])]
+
+    def add_dead_end(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import build_dead_end_doc, dead_end_from_doc
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        doc = build_dead_end_doc(
+            workspace_id=org_id,
+            project_id=project_id,
+            body=body,
+            epoch_id=proj.get("epoch_id"),
+        )
+        self.dead_ends.setdefault(project_id, []).append(doc)
+        return dead_end_from_doc(doc)
+
+    def list_sources(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import source_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        return [
+            source_from_doc(d)
+            for d in self.sources.get(project_id, [])
+            if d.get("deleted_at") is None
+        ]
+
+    def add_source(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import build_source_doc, source_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        doc = build_source_doc(
+            workspace_id=org_id, project_id=project_id, body=body
+        )
+        self.sources.setdefault(project_id, []).append(doc)
+        return source_from_doc(doc)
+
+    def update_source(
+        self, org_id: str, project_id: str, source_id: str, body: Any
+    ) -> Any:
+        from mymlfw.saas.studio import apply_source_update, source_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        for doc in self.sources.get(project_id, []):
+            if (doc.get("id") or doc.get("_id")) == source_id and doc.get(
+                "deleted_at"
+            ) is None:
+                apply_source_update(doc, body)
+                return source_from_doc(doc)
+        raise KeyError("source_not_found")
+
+    def delete_source(self, org_id: str, project_id: str, source_id: str) -> bool:
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        for doc in self.sources.get(project_id, []):
+            if (doc.get("id") or doc.get("_id")) == source_id and doc.get(
+                "deleted_at"
+            ) is None:
+                doc["deleted_at"] = _utcnow()
+                return True
+        raise KeyError("source_not_found")
+
+    def list_roadmap_strategies(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import roadmap_strategy_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        rows = [
+            d
+            for d in self.roadmap_strategies.get(project_id, [])
+            if d.get("deleted_at") is None
+        ]
+        rows.sort(
+            key=lambda d: (int(d.get("priority") or 100), d.get("created_at") or _utcnow())
+        )
+        return [roadmap_strategy_from_doc(d) for d in rows]
+
+    def add_roadmap_strategy(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import (
+            build_roadmap_strategy_doc,
+            roadmap_strategy_from_doc,
+        )
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        doc = build_roadmap_strategy_doc(
+            workspace_id=org_id, project_id=project_id, body=body
+        )
+        self.roadmap_strategies.setdefault(project_id, []).append(doc)
+        return roadmap_strategy_from_doc(doc)
+
+    def update_roadmap_strategy(
+        self, org_id: str, project_id: str, strategy_id: str, body: Any
+    ) -> Any:
+        from mymlfw.saas.studio import (
+            apply_roadmap_strategy_update,
+            roadmap_strategy_from_doc,
+        )
+
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        for doc in self.roadmap_strategies.get(project_id, []):
+            if (doc.get("id") or doc.get("_id")) == strategy_id and doc.get(
+                "deleted_at"
+            ) is None:
+                apply_roadmap_strategy_update(doc, body)
+                return roadmap_strategy_from_doc(doc)
+        raise KeyError("roadmap_strategy_not_found")
+
+    def delete_roadmap_strategy(
+        self, org_id: str, project_id: str, strategy_id: str
+    ) -> bool:
+        if self.get_project(org_id, project_id) is None:
+            raise KeyError("project_not_found")
+        for doc in self.roadmap_strategies.get(project_id, []):
+            if (doc.get("id") or doc.get("_id")) == strategy_id and doc.get(
+                "deleted_at"
+            ) is None:
+                doc["deleted_at"] = _utcnow()
+                return True
+        raise KeyError("roadmap_strategy_not_found")
+
+    def get_project_git(self, org_id: str, project_id: str) -> Any:
+        from mymlfw.saas.schemas import ProjectGitInfo, ProjectGitResponse
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        remote = (proj.get("git_remote") or "").strip()
+        raw = proj.get("git_info")
+        info = None
+        if isinstance(raw, dict) and raw.get("remote"):
+            info = ProjectGitInfo(
+                **{k: v for k, v in raw.items() if k in ProjectGitInfo.model_fields}
+            )
+        elif remote:
+            info = ProjectGitInfo(remote=remote)
+        return ProjectGitResponse(
+            project_id=project_id, linked=bool(remote), git=info
+        )
+
+    def set_project_git(
+        self, org_id: str, project_id: str, remote: str, *, refresh: bool = True
+    ) -> Any:
+        from mymlfw.saas.git_info import build_git_info
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        # In-memory path: parse only (no live GitHub) so unit tests stay offline.
+        _ = refresh
+        info = build_git_info(remote, live=False)
+        proj["git_remote"] = info["remote"]
+        proj["git_info"] = info
+        proj["updated_at"] = _utcnow()
+        return self.get_project_git(org_id, project_id)
+
+    def refresh_project_git(self, org_id: str, project_id: str) -> Any:
+        from mymlfw.saas.git_info import build_git_info
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        remote = (proj.get("git_remote") or "").strip()
+        if not remote:
+            raise KeyError("git_not_linked")
+        linked_at = None
+        if isinstance(proj.get("git_info"), dict):
+            linked_at = proj["git_info"].get("linked_at")
+        info = build_git_info(remote, live=False)
+        info["refresh_error"] = "stats_refresh_requires_mongo"
+        if linked_at is not None:
+            info["linked_at"] = linked_at
+        proj["git_info"] = info
+        proj["updated_at"] = _utcnow()
+        return self.get_project_git(org_id, project_id)
+
+    def clear_project_git(self, org_id: str, project_id: str) -> Any:
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        proj["git_remote"] = None
+        proj["git_info"] = None
+        proj["updated_at"] = _utcnow()
+        return self.get_project_git(org_id, project_id)
+
+    def list_levers(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import experiment_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        return [
+            experiment_from_doc(e) for e in self.experiments.get(project_id, [])
+        ]
+
+    def open_lever(self, org_id: str, project_id: str, body: Any) -> Any:
+        from mymlfw.saas.studio import build_experiment_doc, experiment_from_doc
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        open_n = sum(
+            1
+            for e in self.experiments.get(project_id, [])
+            if e.get("status") == ExperimentStatus.open.value
+            and e.get("deleted_at") is None
+        )
+        if open_n >= 1:
+            raise RuntimeError("one_open_lever")
+        goal_ids = {
+            g.get("_id") or g.get("id") for g in self.goals.get(project_id, [])
+        }
+        if body.goal_id not in goal_ids:
+            raise KeyError("goal_not_found")
+        doc = build_experiment_doc(
+            workspace_id=org_id,
+            project_id=project_id,
+            body=body,
+            epoch_id=proj.get("epoch_id"),
+        )
+        self.experiments.setdefault(project_id, []).append(doc)
+        proj["active_execution_lock"] = {
+            "holder_type": "lever",
+            "holder_id": doc["_id"],
+            "expires_at": _utcnow() + timedelta(hours=24),
+        }
+        proj["updated_at"] = _utcnow()
+        return experiment_from_doc(doc)
+
+    def close_lever(
+        self, org_id: str, project_id: str, experiment_id: str, body: Any
+    ) -> Any:
+        from mymlfw.saas.studio import apply_lever_close, experiment_from_doc
+
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        for exp in self.experiments.get(project_id, []):
+            if exp.get("_id") == experiment_id and exp.get("deleted_at") is None:
+                apply_lever_close(exp, body)
+                lock = proj.get("active_execution_lock") or {}
+                if lock.get("holder_id") == experiment_id:
+                    proj["active_execution_lock"] = None
+                proj["updated_at"] = _utcnow()
+                return experiment_from_doc(exp)
+        raise KeyError("lever_not_found")
+
+    def list_missions(self, org_id: str, project_id: str) -> list[Any]:
+        from mymlfw.saas.studio import mission_from_doc
+
+        if self.get_project(org_id, project_id) is None:
+            return []
+        return [mission_from_doc(m) for m in self.missions.get(project_id, [])]
+
     def get_project(self, org_id: str, project_id: str) -> dict[str, Any] | None:
         proj = self.projects.get(project_id)
         if proj is None or proj.get("workspace_id") != org_id:
@@ -257,10 +651,42 @@ class CampaignBrainStore:
             return None
         return proj
 
+    def set_kaggle_intel(
+        self, org_id: str, project_id: str, panel: dict[str, Any]
+    ) -> None:
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        proj["kaggle_intel"] = dict(panel)
+        proj["updated_at"] = _utcnow()
+
+    def set_kaggle_data(
+        self, org_id: str, project_id: str, inventory: dict[str, Any]
+    ) -> None:
+        proj = self.get_project(org_id, project_id)
+        if proj is None:
+            raise KeyError("project_not_found")
+        proj["kaggle_data"] = dict(inventory)
+        proj["updated_at"] = _utcnow()
+
     def dashboard(self, org_id: str, project_id: str) -> DashboardResponse | None:
+        from mymlfw.saas.schemas import DashboardKagglePanel, ProjectKind
+
         proj = self.get_project(org_id, project_id)
         if proj is None:
             return None
+        kaggle_panel = None
+        intel = proj.get("kaggle_intel") if isinstance(proj.get("kaggle_intel"), dict) else None
+        if intel or proj.get("kind") == ProjectKind.kaggle.value:
+            from mymlfw.saas.db.kaggle_docs import finite_float, finite_int, parse_utc
+
+            kaggle_panel = DashboardKagglePanel(
+                linked=bool(proj.get("kaggle_competition")),
+                rank=finite_int((intel or {}).get("rank")),
+                public_score=finite_float((intel or {}).get("public_score")),
+                medal_pace=(intel or {}).get("medal_pace"),
+                last_sync=parse_utc((intel or {}).get("last_sync")),
+            )
         return compute_dashboard(
             project_id=project_id,
             goals=self.goals.get(project_id, []),
@@ -269,6 +695,7 @@ class CampaignBrainStore:
             dead_ends=self.dead_ends.get(project_id, []),
             folds_sha256=proj.get("folds_sha256"),
             adv_auc=proj.get("adv_auc"),
+            kaggle=kaggle_panel,
         )
 
     def claim_next_mission(
@@ -350,6 +777,56 @@ class CampaignBrainStore:
         mission["completion_notes"] = notes
         mission["lease_expires_at"] = now
         mission["updated_at"] = now
+        # Phase E: contrastive episode card + utility bandit on cited IDs.
+        from mymlfw.saas.rag.contrastive import build_episode_card
+        from mymlfw.saas.rag.consolidate import consolidate_project_brain
+        from mymlfw.saas.rag.contradiction import mark_needs_reverification
+        from mymlfw.saas.rag.utility import update_cited_memory_utility
+
+        proj = self.projects.get(project_id) or {}
+        variable = str(mission.get("variable") or mission.get("title") or "")
+        card = build_episode_card(
+            project_id=project_id,
+            workspace_id=org_id,
+            outcome=normalized,
+            notes=notes,
+            fold_scores=list(fold_scores or []),
+            variable=variable,
+            epoch_id=proj.get("epoch_id"),
+            mission_title=str(mission.get("title") or ""),
+        )
+        self.episode_cards.setdefault(project_id, []).append(card)
+        cited = list(mission.get("cited_memory_ids") or [])
+        update_cited_memory_utility(
+            [
+                *self.dead_ends.get(project_id, []),
+                *self.episode_cards.get(project_id, []),
+            ],
+            cited_ids=cited,
+            outcome=normalized,
+        )
+        context_shifted = "context_shift" in (notes or "").lower() or bool(
+            mission.get("context_conditions")
+        )
+        mark_needs_reverification(
+            self.dead_ends.get(project_id, []),
+            variable_family=variable.split("=", 1)[0] if variable else None,
+            new_epoch_id=proj.get("epoch_id"),
+            context_shifted=context_shifted,
+        )
+        closed = sum(
+            1
+            for m in self.missions.get(project_id, [])
+            if m.get("status") in {"succeeded", "failed", "abandoned_by_agent"}
+        )
+        if closed > 0 and closed % 10 == 0:
+            self.axioms[project_id] = consolidate_project_brain(
+                project_id=project_id,
+                workspace_id=org_id,
+                dead_ends=self.dead_ends.get(project_id, []),
+                episode_cards=self.episode_cards.get(project_id, []),
+                epoch_id=proj.get("epoch_id"),
+            )
         return dict(mission)
 
     def renew_mission_lease(
@@ -467,6 +944,7 @@ class CampaignBrainStore:
                 artifact_key=proj.get("folds_artifact_key"),
             ),
             public_share_slug=proj.get("public_share_slug"),
+            updated_at=proj.get("updated_at"),
         )
 
 

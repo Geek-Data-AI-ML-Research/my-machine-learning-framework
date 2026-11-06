@@ -1,4 +1,4 @@
-"""Local BYOC runner client: heartbeat + claim-job → job-scoped token stubs."""
+"""Local BYOC runner client: heartbeat + claim-job → hashed job-scoped tokens."""
 
 from __future__ import annotations
 
@@ -28,23 +28,37 @@ def hash_runner_token(token: str) -> bytes:
     return hashlib.sha256(token.encode("utf-8")).digest()
 
 
-def mint_job_token_stub(*, run_id: str | None = None) -> JobScopedCredentials:
-    """Mint a 2h job_token + empty presign lists (API fills real MinIO pins)."""
+def hash_job_token(token: str) -> bytes:
+    return hashlib.sha256(token.encode("utf-8")).digest()
+
+
+def mint_job_token(
+    *,
+    run_id: str | None = None,
+    job_id: str | None = None,
+    upload_presigns: list[dict[str, str]] | None = None,
+    download_presigns: list[dict[str, str]] | None = None,
+) -> JobScopedCredentials:
+    """Mint a 2h job_token (raw returned once; callers persist ``hash_job_token`` only)."""
     raw = f"{new_job_token_id()}_{secrets.token_urlsafe(24)}"
     return JobScopedCredentials(
-        job_id=new_job_id(),
+        job_id=job_id or new_job_id(),
         job_token=raw,
         expires_at=datetime.now(UTC) + JOB_TOKEN_TTL,
         run_id=run_id,
-        upload_presigns=[],
-        download_presigns=[],
+        upload_presigns=list(upload_presigns or []),
+        download_presigns=list(download_presigns or []),
         sandbox_notes=sandbox_notes(),
     )
 
 
+# Back-compat alias for older imports / tests.
+mint_job_token_stub = mint_job_token
+
+
 @dataclass
 class RunnerClient:
-    """In-process stub used by CLI/tests until HTTP claim routes are live."""
+    """In-process runner agent used by API claim routes and local CLI."""
 
     api_url: str = ""
     runner_token: str = ""
@@ -53,6 +67,8 @@ class RunnerClient:
     last_heartbeat_at: datetime | None = None
     token_hash: bytes | None = None
     _queue: list[dict[str, Any]] = field(default_factory=list)
+    # job_id → sha256(job_token) — never store reversible tokens.
+    _job_token_hashes: dict[str, bytes] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> RunnerClient:
@@ -82,10 +98,29 @@ class RunnerClient:
         )
         return RunnerHeartbeatResponse(runner_id=self.runner_id, accepted=True, server_time=now)
 
-    def enqueue_stub_job(self, *, run_id: str | None = None) -> str:
+    def enqueue_job(
+        self,
+        *,
+        run_id: str | None = None,
+        upload_presigns: list[dict[str, str]] | None = None,
+        download_presigns: list[dict[str, str]] | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> str:
         job_id = new_job_id()
-        self._queue.append({"job_id": job_id, "run_id": run_id})
+        self._queue.append(
+            {
+                "job_id": job_id,
+                "run_id": run_id,
+                "upload_presigns": list(upload_presigns or []),
+                "download_presigns": list(download_presigns or []),
+                "payload": dict(payload or {}),
+            }
+        )
         return job_id
+
+    # Back-compat
+    def enqueue_stub_job(self, *, run_id: str | None = None) -> str:
+        return self.enqueue_job(run_id=run_id)
 
     def claim_job(self, body: JobClaimRequest | None = None) -> JobClaimResponse:
         body = body or JobClaimRequest(runner_id=self.runner_id)
@@ -94,9 +129,13 @@ class RunnerClient:
         if not self._queue:
             return JobClaimResponse(claimed=False, credentials=None)
         job = self._queue.pop(0)
-        creds = mint_job_token_stub(run_id=job.get("run_id"))
-        # Preserve job_id from queue for traceability in stub mode.
-        creds = creds.model_copy(update={"job_id": job["job_id"]})
+        creds = mint_job_token(
+            run_id=job.get("run_id"),
+            job_id=job["job_id"],
+            upload_presigns=job.get("upload_presigns"),
+            download_presigns=job.get("download_presigns"),
+        )
+        self._job_token_hashes[creds.job_id] = hash_job_token(creds.job_token)
         self.heartbeat(status="busy", capability_tags=body.capability_tags)
         return JobClaimResponse(claimed=True, credentials=creds)
 
@@ -112,7 +151,7 @@ class RunnerClient:
             "last_heartbeat_at": (
                 self.last_heartbeat_at.isoformat() if self.last_heartbeat_at else None
             ),
-            "queued_stub_jobs": len(self._queue),
+            "queued_jobs": len(self._queue),
             "sandbox_notes": sandbox_notes(),
             "mongo_uri_in_env": False,
         }

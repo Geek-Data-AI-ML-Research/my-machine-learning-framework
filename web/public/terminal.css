@@ -1,0 +1,253 @@
+/* terminal.css by panr, scoped to the login screen. https://panr.github.io/terminal-css/ */
+@import url("https://cdn.staticdelivr.com/gfonts/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+
+.terminal {
+  --background: #1a170f;
+  --foreground: #eceae5;
+  --accent: #eec35e;
+  --font-size: 1rem;
+  --line-height: 1.54em;
+  --radius: 0px;
+}
+
+.terminal h1 { font-size: calc(var(--font-size) * 1.45); letter-spacing: 0; }.terminal{
+  box-sizing: border-box;
+}.terminal, .terminal *, .terminal *:before, .terminal *:after{
+  box-sizing: inherit;
+  margin: 0;
+  padding: 0;
+}.terminal{
+  font-family:
+    "Fira Code",
+    "JetBrains Mono",
+    Monaco,
+    Consolas,
+     "Ubuntu Mono",
+    monospace;
+  font-size: var(--font-size);
+  font-weight: 400;
+  line-height: var(--line-height);
+  background-color: var(--background);
+  color: var(--foreground);
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: contextual;
+  -webkit-overflow-scrolling: touch;
+  -webkit-text-size-adjust: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* [[ HEADING ]] */.terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6, .terminal p, .terminal ul, .terminal ol, .terminal img, .terminal figure, .terminal video, .terminal table{
+  margin: 25px 0;
+}.terminal a{
+  color: var(--accent);
+}.terminal button{
+  position: relative;
+  font: inherit;
+  font-weight: bold;
+  text-decoration: none;
+  text-align: center;
+  background: transparent;
+  color: var(--accent);
+  padding: 5px 18px;
+  border: 4px solid var(--accent);
+  border-radius: var(--radius);
+  transition: background 0.15s linear;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}.terminal button:hover{
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}.terminal button:focus-visible, .terminal a:focus-visible{
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}.terminal fieldset{
+  display: inline-block;
+  border: 2px solid var(--foreground);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 10px;
+}.terminal fieldset *:first-child{
+  margin-top: 0;
+}.terminal fieldset input, .terminal fieldset select, .terminal fieldset textarea, .terminal fieldset label, .terminal fieldset button{
+  margin-top: calc(var(--line-height) * 0.5);
+  width: 100%;
+}.terminal label{
+  display: inline-block;
+}.terminal label input{
+  margin-top: 0;
+}.terminal input, .terminal textarea, .terminal select{
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--foreground);
+  border-radius: var(--radius);
+  padding: 10px;
+  font: inherit;
+  appearance: none;
+}.terminal input[type="checkbox"]{
+  width: auto;
+}.terminal input:focus-visible, .terminal input:active, .terminal textarea:focus-visible, .terminal textarea:active, .terminal select:focus-visible, .terminal select:active{
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}.terminal input:active, .terminal textarea:active, .terminal select:active{
+  box-shadow: none;
+}.terminal select{
+  background-image: linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--foreground) 50%
+    ),
+    linear-gradient(135deg, var(--foreground) 50%, transparent 50%);
+  background-position: calc(100% - 20px), calc(100% - 15px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}.terminal select option{
+  background: var(--background);
+}.terminal input[type="checkbox"], .terminal input[type="radio"]{
+  vertical-align: middle;
+  padding: 10px;
+  box-shadow: inset 0 0 0 3px var(--background);
+}.terminal input[type="radio"]{
+  display: inline-block;
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 20px;
+}.terminal input[type="checkbox"]:checked, .terminal input[type="radio"]:checked{
+  background: var(--accent);
+}.terminal img{
+  display: block;
+  max-width: 100%;
+  border: 8px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 8px;
+  overflow: hidden;
+}.terminal figure img, .terminal figure video{
+  margin-bottom: 0;
+}.terminal figure figcaption{
+  background: var(--accent);
+  color: var(--background);
+  text-align: center;
+  font-size: 1em;
+  font-weight: normal;
+  margin-top: -8px;
+  border-radius: 0 0 var(--radius) var(--radius);
+}.terminal ul, .terminal ol{
+  margin-left: 4ch;
+  padding: 0;
+}.terminal ul ul, .terminal ul ol, .terminal ol ul, .terminal ol ol{
+  margin-top: 0;
+}.terminal li::marker{
+  color: var(--accent);
+}.terminal ul li, .terminal ol li{
+  position: relative;
+}.terminal code, .terminal kbd{
+  font-family:
+    "Fira Code",
+    "JetBrains Mono",
+    Monaco,
+    Consolas,
+    Ubuntu Mono,
+    monospace !important;
+  font-feature-settings: normal;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  color: color-mix(in srgb, var(--foreground) 5%, var(--accent));
+  padding: 0 6px;
+  margin: 0 2px;
+  font-size: 0.95em;
+}.terminal code{
+  border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent);
+}.terminal kbd{
+  border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+  border-bottom: 4px solid var(--accent);
+  border-radius: 4px;
+}.terminal code code{
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}.terminal pre{
+  tab-size: 4;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent) !important;
+  color: color-mix(in srgb, var(--foreground) 5%, var(--accent));
+  padding: 20px 10px;
+  font-size: 0.95em !important;
+  overflow: auto;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent);
+}.terminal pre code{
+  background: none !important;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  border: none;
+}.terminal sup{
+  line-height: 0;
+}.terminal abbr{
+  position: relative;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--accent);
+  cursor: help;
+}.terminal sub{
+  bottom: -0.25em;
+}.terminal sup{
+  top: -0.25em;
+}.terminal mark{
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--foreground);
+}.terminal blockquote{
+  position: relative;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  margin: 0;
+  padding: 25px;
+}.terminal blockquote:before{
+  content: ">";
+  display: block;
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}.terminal blockquote p:first-child{
+  margin-top: 0;
+}.terminal blockquote p:last-child{
+  margin-bottom: 0;
+}.terminal table{
+  table-layout: auto;
+  border-collapse: collapse;
+}.terminal table, .terminal th, .terminal td{
+  border: 2px solid var(--foreground);
+  padding: 10px;
+}.terminal th{
+  border-style: solid;
+  color: var(--foreground);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}.terminal hr{
+  width: 100%;
+  border: none;
+  background: var(--accent);
+  height: 2px;
+}
+
+/* Bold elements */.terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6, .terminal b, .terminal strong, .terminal th, .terminal button{
+  font-weight: 600;
+}
+
+.terminal {
+  width: min(28rem, 100%);
+  background: var(--background);
+  padding: 1.5rem 1.25rem 2rem;
+  font-variant-ligatures: none;
+}
+.terminal fieldset {
+  display: block;
+  width: 100%;
+}
+.terminal p.hint {
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+  margin-bottom: 0;
+}

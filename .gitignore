@@ -8,3 +8,6 @@ build/
 recipes/memory.db
 recipes/memory.db-wal
 recipes/memory.db-shm
+
+# Web tooling
+web/node_modules/

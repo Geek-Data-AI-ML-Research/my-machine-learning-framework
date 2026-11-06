@@ -57,3 +57,47 @@ def new_job_id() -> str:
 
 def new_job_token_id() -> str:
     return new_prefixed_id("jtk")
+
+
+def new_cloud_account_id() -> str:
+    return new_prefixed_id("cpa")
+
+
+def new_autopilot_session_id() -> str:
+    return new_prefixed_id("aps")
+
+
+def new_autopilot_node_id() -> str:
+    return new_prefixed_id("nd")
+
+
+def new_episode_card_id() -> str:
+    return new_prefixed_id("epc")
+
+
+def new_axiom_id() -> str:
+    return new_prefixed_id("axm")
+
+
+def new_memory_id() -> str:
+    return new_prefixed_id("mem")
+
+
+def new_credit_id() -> str:
+    return new_prefixed_id("crd")
+
+
+def new_progress_id() -> str:
+    return new_prefixed_id("prg")
+
+
+def new_source_id() -> str:
+    return new_prefixed_id("src")
+
+
+def new_roadmap_strategy_id() -> str:
+    return new_prefixed_id("rds")
+
+
+def new_gap_id() -> str:
+    return new_prefixed_id("gap")

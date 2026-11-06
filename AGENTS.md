@@ -2,14 +2,14 @@
 
 mymlfw 0.1.0. Read `llms.txt` before editing a contest. Human documentation is [docs/index.md](docs/index.md).
 
-Campaign SaaS work: also read partitioned AGENTS under `src/mymlfw/saas/`, `src/mymlfw/saas/db/`, `src/mymlfw/saas/rag/`, `src/mymlfw/mcp/`, and `web/`. Web agents: `npx skills add bas3line/ascii`.
+Campaign SaaS work: also read partitioned AGENTS under `src/mymlfw/saas/`, `src/mymlfw/saas/db/`, `src/mymlfw/saas/rag/`, `src/mymlfw/mcp/`, and `web/`. Web UI stack: see `web/AGENTS.md` (Tailwind CSS + Charts.css; not ascii.rest).
 
 ## Commands
 
 - Tests: `python -m pytest -q` from this checkout. Use the project virtualenv when it exists: `.venv/bin/python -m pytest -q`.
 - CLI: `python -m mymlfw`. Failures are one JSON object on stderr with `error_code` and `suggested_fix`.
 - Refresh the recipe block inside `llms.txt`: `python -m mymlfw sync-docs`. Keep the file at or under 1500 whitespace tokens. The checkout copy and `src/mymlfw/resources/llms.txt` stay identical.
-- SaaS local stack: `make dev` (or `just up`) from checkout — Compose binds mongo/redis/minio to `127.0.0.1` only.
+- SaaS local stack: `make dev` (or `just up`) from checkout — Compose binds mongo/redis/minio to `127.0.0.1` only. Operator docs: [docs/how-to/run-campaign-saas.md](docs/how-to/run-campaign-saas.md), [docs/how-to/connect-cloud-runners.md](docs/how-to/connect-cloud-runners.md), [docs/reference/saas-env.md](docs/reference/saas-env.md).
 
 ## Rules that override a local shortcut
 
@@ -33,7 +33,7 @@ Binding for SaaS/api/mcp/web work. History and shortcut fixes never weaken these
 - Embeddings / LLM: only through **`saas/llm.py`** (external providers + spend caps).
 - Ensemble / Autopilot / RAG math on control plane: **NumPy/SciPy only**—no torch in api/mcp images.
 - MCP tools: thin → saas services; business logic never inside `mcp/` handlers.
-- ascii.rest: **Motion = Active State**; kit for live metrics; `mono` logos; hex-only colors; one inverted CTA.
+- Web console: **Tailwind CSS** + **Charts.css** for layout and metrics; Motion = Active State (animate only while running/syncing); one primary CTA per screen.
 - Agents **must** `register_external_asset` when pulling HF/Kaggle/paper/kernel assets.
 - Ship incomplete C–E3 behind **`feature_flags`**; keep OpenAPI + TS types in lockstep.
 - Before closing a phase: tick every item in that phase’s Section checklist; do not mark done if any box is skipped.
@@ -69,8 +69,8 @@ Binding for SaaS/api/mcp/web work. History and shortcut fixes never weaken these
 - Do **not** pass `session=` inconsistently—use **`session.bind()` + `with_transaction`** for multi-doc ACID.
 - Do **not** invent new JSON field names—extend `schemas.py` + regenerate OpenAPI first.
 - Do **not** import `mymlfw.train` / engines from `saas/rag/` (AST-parse engine names only, same as existing rag rule).
-- Do **not** replace ascii.rest with Tailwind UI / Chart.js / Material.
-- Do **not** animate idle dashboards (`matrix-rain`, looping fireworks, marquee on Overview).
+- Do **not** reintroduce ascii.rest / terminal-kit UI as the Studio design system.
+- Do **not** animate idle dashboards (looping decorative motion, marquee noise on Overview).
 - Do **not** skip Section checklists when “almost done.”
 
 ### Drift detection (CI / pre-commit)
@@ -93,4 +93,6 @@ Binding for SaaS/api/mcp/web work. History and shortcut fixes never weaken these
 | SaaS API contracts | `src/mymlfw/saas/schemas.py`, `contracts/openapi.json` |
 | FastAPI gateway | `src/mymlfw/api/` |
 | MCP handlers | `src/mymlfw/mcp/` |
+| Agent ↔ Studio via MCP | [docs/how-to/agent-mcp-campaign-sync.md](docs/how-to/agent-mcp-campaign-sync.md), MCP prompt `campaign_sync` |
 | SaaS web console | `web/` |
+| SaaS env / cloud how-to | `docs/reference/saas-env.md`, `docs/how-to/connect-cloud-runners.md` |

@@ -1,0 +1,23 @@
+{
+  "name": "memory_vector",
+  "type": "vectorSearch",
+  "definition": {
+    "fields": [
+      {
+        "type": "vector",
+        "path": "embedding",
+        "numDimensions": 64,
+        "similarity": "cosine",
+        "quantization": "scalar"
+      },
+      {"type": "filter", "path": "workspace_id"},
+      {"type": "filter", "path": "project_id"},
+      {"type": "filter", "path": "epoch_id"},
+      {"type": "filter", "path": "doc_type"},
+      {"type": "filter", "path": "deleted_at"}
+    ],
+    "storedSource": {
+      "include": ["text", "doc_type", "epoch_id", "utility_weight"]
+    }
+  }
+}

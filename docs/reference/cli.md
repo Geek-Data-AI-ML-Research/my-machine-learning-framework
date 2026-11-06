@@ -52,6 +52,22 @@ Flags below are the ones the parser requires or commonly takes. Defaults are the
 | `train grpo` | `--groups`. |
 | `cloud launch` | `--project`, `--role`, `--gpu`, `--command`, `--idle-kill`, `--max-runtime`, `--ledger`, `--experiment-id`, `--baseline-id`, `--variable`, `--band-low`, `--band-high`, `--out`. The environment variable `CLOUD_APPROVAL` must be set. The command writes a script. It does not start a machine. |
 
+## Campaign SaaS cloud (providers)
+
+Requires the `saas` extra and `MYMLFW_CLOUD_RUNNERS=1`. Live RunPod/AWS when credentials are sealed and `MYMLFW_CLOUD_MOCK` is unset. See [Connect cloud runners](../how-to/connect-cloud-runners.md) and [SaaS environment](saas-env.md).
+
+| Command | Required | Notes |
+| --- | --- | --- |
+| `cloud connect` | `--provider runpod\|aws` | RunPod: `--api-key`. AWS: `--role-arn`, optional `--region`. |
+| `cloud disconnect` | `--provider` | Soft-disconnect account. |
+| `cloud list` | | Accounts + runners JSON. |
+| `cloud gpus` | `--provider` | Catalog + `cost_estimate_micros_hr`. |
+| `cloud launch` | `--provider`, `--gpu-type` | Pass `--quote-only` first. Billable without it when connected. |
+| `cloud stop` | `--runner-id` | |
+| `cloud terminate` | `--runner-id` | |
+
+When both the contest renderer and SaaS subcommands share the `cloud` parser name, the SaaS path is selected when `--provider` is present; the renderer path uses `--project` / `--out` / `CLOUD_APPROVAL`.
+
 ## Memory
 
 | Command | Required |
