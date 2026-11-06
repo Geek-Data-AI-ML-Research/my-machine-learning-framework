@@ -42,56 +42,7 @@
 
     <main id="main">
       <section class="hero" id="top" aria-label="Introduction">
-        <div class="hero-plane" aria-hidden="true">
-          <!-- Product visual: ledger rows + fold strip as atmospheric plane -->
-          <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" role="presentation">
-            <defs>
-              <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.72"/>
-                <stop offset="100%" stop-color="#c5ddd4" stop-opacity="0.55"/>
-              </linearGradient>
-            </defs>
-            <g transform="translate(620 170)">
-              <rect x="0" y="0" width="520" height="520" rx="18" fill="url(#panel)" stroke="#14201c" stroke-opacity="0.14"/>
-              <text x="28" y="42" font-family="IBM Plex Mono, monospace" font-size="14" fill="#5c6f67">ledger / experiments.csv</text>
-              <g font-family="IBM Plex Mono, monospace" font-size="13" fill="#14201c">
-                <text x="28" y="92">exp_id</text>
-                <text x="160" y="92" fill="#5c6f67">variable</text>
-                <text x="340" y="92" fill="#5c6f67">cv</text>
-                <text x="420" y="92" fill="#5c6f67">verdict</text>
-                <line x1="28" y1="108" x2="492" y2="108" stroke="#14201c" stroke-opacity="0.12"/>
-                <text x="28" y="138">exp_001</text>
-                <text x="160" y="138">lora_r=16</text>
-                <text x="340" y="138">0.742</text>
-                <text x="420" y="138" fill="#0f766e">keep</text>
-                <text x="28" y="178">exp_002</text>
-                <text x="160" y="178">depth=8</text>
-                <text x="340" y="178">0.711</text>
-                <text x="420" y="178" fill="#9a3412">kill</text>
-                <text x="28" y="218">exp_003</text>
-                <text x="160" y="218">blend_w</text>
-                <text x="340" y="218">0.749</text>
-                <text x="420" y="218" fill="#5c6f67">pending</text>
-              </g>
-              <g transform="translate(28 270)">
-                <text x="0" y="0" font-family="IBM Plex Mono, monospace" font-size="12" fill="#5c6f67">OOF folds · GroupKFold</text>
-                <rect x="0" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.85"/>
-                <rect x="84" y="18" width="72" height="28" rx="4" fill="#14b8a6" opacity="0.55"/>
-                <rect x="168" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.7"/>
-                <rect x="252" y="18" width="72" height="28" rx="4" fill="#14b8a6" opacity="0.4"/>
-                <rect x="336" y="18" width="72" height="28" rx="4" fill="#0f766e" opacity="0.6"/>
-              </g>
-              <g transform="translate(28 360)" font-family="IBM Plex Mono, monospace" font-size="12">
-                <text fill="#5c6f67">preflight</text>
-                <text x="0" y="28" fill="#0f766e">✓ artifact sha</text>
-                <text x="0" y="52" fill="#0f766e">✓ probe open</text>
-                <text x="0" y="76" fill="#0f766e">✓ kernel offline</text>
-              </g>
-            </g>
-          </svg>
-        </div>
-
-        <div class="wrap">
+        <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="hero-brand">mymlfw</p>
             <h1 class="hero-title">Run contests with a memory of what already failed</h1>
@@ -103,6 +54,53 @@
               <a class="btn btn-ghost" href="#start">Get started</a>
             </div>
           </div>
+
+          <figure class="hero-visual" aria-label="Experiment ledger preview">
+            <svg viewBox="0 0 520 480" role="img" aria-labelledby="hero-visual-title">
+              <title id="hero-visual-title">Preview of an experiments ledger with OOF folds and preflight checks</title>
+              <defs>
+                <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="100%" stop-color="#e4f0eb"/>
+                </linearGradient>
+              </defs>
+              <rect x="0.5" y="0.5" width="519" height="479" rx="16" fill="url(#panel)" stroke="#14201c" stroke-opacity="0.14"/>
+              <text x="28" y="40" font-family="IBM Plex Mono, monospace" font-size="13" fill="#5c6f67">ledger / experiments.csv</text>
+              <g font-family="IBM Plex Mono, monospace" font-size="13" fill="#14201c">
+                <text x="28" y="84" fill="#5c6f67">exp_id</text>
+                <text x="140" y="84" fill="#5c6f67">variable</text>
+                <text x="300" y="84" fill="#5c6f67">cv</text>
+                <text x="390" y="84" fill="#5c6f67">verdict</text>
+                <line x1="28" y1="98" x2="492" y2="98" stroke="#14201c" stroke-opacity="0.12"/>
+                <text x="28" y="128">exp_001</text>
+                <text x="140" y="128">lora_r=16</text>
+                <text x="300" y="128">0.742</text>
+                <text x="390" y="128" fill="#0f766e">keep</text>
+                <text x="28" y="164">exp_002</text>
+                <text x="140" y="164">depth=8</text>
+                <text x="300" y="164">0.711</text>
+                <text x="390" y="164" fill="#9a3412">kill</text>
+                <text x="28" y="200">exp_003</text>
+                <text x="140" y="200">blend_w</text>
+                <text x="300" y="200">0.749</text>
+                <text x="390" y="200" fill="#5c6f67">pending</text>
+              </g>
+              <g transform="translate(28 248)">
+                <text x="0" y="0" font-family="IBM Plex Mono, monospace" font-size="12" fill="#5c6f67">OOF folds · GroupKFold</text>
+                <rect x="0" y="16" width="80" height="26" rx="4" fill="#0f766e" opacity="0.85"/>
+                <rect x="92" y="16" width="80" height="26" rx="4" fill="#14b8a6" opacity="0.55"/>
+                <rect x="184" y="16" width="80" height="26" rx="4" fill="#0f766e" opacity="0.7"/>
+                <rect x="276" y="16" width="80" height="26" rx="4" fill="#14b8a6" opacity="0.4"/>
+                <rect x="368" y="16" width="80" height="26" rx="4" fill="#0f766e" opacity="0.6"/>
+              </g>
+              <g transform="translate(28 330)" font-family="IBM Plex Mono, monospace" font-size="13">
+                <text fill="#5c6f67">preflight</text>
+                <text x="0" y="32" fill="#0f766e">✓ artifact sha</text>
+                <text x="0" y="58" fill="#0f766e">✓ probe open</text>
+                <text x="0" y="84" fill="#0f766e">✓ kernel offline</text>
+              </g>
+            </svg>
+          </figure>
         </div>
       </section>
 
