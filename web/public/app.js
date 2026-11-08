@@ -32,7 +32,7 @@
     intel: null,
     autopilot: null,
     accounts: null,
-    wizard: { step: 0, name: "", kind: "standalone", threshold: "0.30", kaggle: "", git: "" },
+    wizard: null,
     settings: null,
     inviteFor: null,
     inviteEmail: "",
@@ -544,7 +544,7 @@
   <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight text-signal">Projects</h1>
-      <p class="mt-1 text-sm text-mist-400">Manage campaigns. New project opens the wizard.</p>
+      <p class="mt-1 text-sm text-mist-400">Manage campaigns. New project opens the DS playbook wizard (EDA → CV → baseline).</p>
     </div>
     <button type="button" class="studio-cta" id="new-project">New project</button>
   </div>
@@ -589,7 +589,7 @@
     }
     bindShell(() => {
       document.getElementById("new-project").onclick = () => {
-        state.wizard = { step: 0, name: "", kind: "standalone", threshold: "0.30", kaggle: "", git: "" };
+        state.wizard = defaultWizard();
         state.error = "";
         setRoute("studio/new");
       };
@@ -706,86 +706,364 @@
     });
   }
 
-  function renderWizard() {
-    showChrome("studio");
-    const w = state.wizard || { step: 0 };
-    const steps = ["kind", "goals", "link", "review"];
-    const stepName = steps[w.step] || "kind";
-    let panel = "";
-    const tips = {
-      kind: "Real campaign name. Choose kaggle when you have a competition slug.",
-      goals: "One measurable primary goal. Threshold is the bar you must beat.",
+  function defaultWizard() {
+    return {
+      step: 0,
+      name: "",
+      kind: "standalone",
+      modality: "tabular",
+      validation: "time_group",
+      baseline: "lightgbm",
+      threshold: "0.30",
+      kaggle: "",
+      git: "",
+      seedRoadmap: true,
+    };
+  }
+
+  function wizardSteps() {
+    return ["venue", "modality", "validation", "baseline", "link", "review"];
+  }
+
+  function wizardStepMeta(id) {
+    const map = {
+      venue: { label: "Venue", title: "Name the campaign & pick the venue" },
+      modality: { label: "Data", title: "What does the data look like?" },
+      validation: { label: "CV", title: "Lock a leak-free validation split" },
+      baseline: { label: "Baseline", title: "Start with a fast dumb baseline" },
+      link: { label: "Links", title: "Connect competition or git" },
+      review: { label: "Create", title: "Review playbook & create" },
+    };
+    return map[id] || { label: id, title: id };
+  }
+
+  function wizardCoach(w, stepName) {
+    const coaches = {
+      venue:
+        "Never start by picking a model. First 60% of Kaggle and commercial work is identical: EDA → lock CV → dumb baseline → domain features. The last 40% diverges (LB squeeze vs ROI/latency).",
+      modality:
+        "Match modality to model family later — not now. Tabular → trees + linear. Text/docs → transformers. Vision → pretrained backbones. Sequences → rolling aggregates first, then a small sequence model if needed.",
+      validation:
+        w.kind === "kaggle"
+          ? "Static / synthetic contests: StratifiedKFold (often 5 folds) so each fold mirrors the target rate. Treat this as the yardstick before any feature or model claim."
+          : "Live commercial data: prefer time-based holdout plus group splits (same customer/entity stays in one split) so you never peek into the future.",
+      baseline:
+        "Run an out-of-the-box LightGBM / Logistic / XGB on raw features on CPU (15–60s). You get a score to beat and a feature-importance leak alarm (e.g. 0.99 importance on one column).",
       link:
         w.kind === "kaggle"
-          ? "Paste the exact competition slug from the Kaggle URL. Seal the API token later under Kaggle."
-          : "Git is optional. Link it from Ops when the repo exists.",
-      review: "Create writes Mongo under your org. Next: Overview → Sync Kaggle if linked.",
+          ? "Paste the exact competition slug from the Kaggle URL. Seal API tokens later under Kaggle — never in the project name."
+          : "Git is optional at create time. Link from Ops when the repo exists.",
+      review:
+        "Create writes the project under your org and seeds Stages 1–5 on the Roadmap so agents start with EDA, not GPT.",
     };
-    if (stepName === "kind") {
+    return coaches[stepName] || "";
+  }
+
+  function wizardChoice(name, value, selected, title, hint) {
+    const on = selected === value;
+    return `<label class="flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
+      on
+        ? "border-signal/50 bg-signal/10"
+        : "border-ink-700 bg-ink-950/40 hover:border-ink-500"
+    }">
+      <input type="radio" class="mt-1" name="${escText(name)}" value="${escText(value)}" ${on ? "checked" : ""} />
+      <span class="min-w-0">
+        <span class="block text-sm font-medium text-signal">${escText(title)}</span>
+        <span class="mt-0.5 block text-xs leading-relaxed text-mist-400">${escText(hint)}</span>
+      </span>
+    </label>`;
+  }
+
+  function applyVenueDefaults(w) {
+    if (w.kind === "kaggle") {
+      if (!w.validation || w.validation === "time_group") w.validation = "skf5";
+      if (!w.threshold || w.threshold === "0.30") w.threshold = "0.70";
+    } else {
+      if (!w.validation || w.validation === "skf5") w.validation = "time_group";
+      if (!w.threshold || w.threshold === "0.70") w.threshold = "0.30";
+    }
+    if (w.modality === "tabular" && !w.baseline) w.baseline = "lightgbm";
+    if (w.modality === "text") w.baseline = w.baseline || "logistic";
+    if (w.modality === "vision") w.baseline = "lightgbm";
+    if (w.modality === "sequential") w.baseline = "lightgbm";
+  }
+
+  function playbookLabels(w) {
+    const modality = {
+      tabular: "Structured tabular",
+      text: "Text / documents",
+      vision: "Images / video / audio",
+      sequential: "Sequential events",
+    };
+    const validation = {
+      skf5: "5-fold StratifiedKFold",
+      time_group: "Time holdout + group split",
+      group_kfold: "GroupKFold (entity-safe)",
+    };
+    const baseline = {
+      lightgbm: "LightGBM (default trees)",
+      logistic: "Logistic / Ridge",
+      xgboost: "XGBoost",
+      catboost: "CatBoost",
+    };
+    return {
+      venue: w.kind === "kaggle" ? "Kaggle competition" : "Commercial / standalone",
+      modality: modality[w.modality] || w.modality,
+      validation: validation[w.validation] || w.validation,
+      baseline: baseline[w.baseline] || w.baseline,
+    };
+  }
+
+  function buildPlaybookRoadmap(w) {
+    const labels = playbookLabels(w);
+    const isKaggle = w.kind === "kaggle";
+    const baselinePlan =
+      w.modality === "text"
+        ? `After EDA + CV lock: start with a fast linear/logistic or embedding + linear baseline before heavy LLMs. Preferred starter: ${labels.baseline}. Only escalate to DeBERTa / open-weight LLMs if text columns carry the signal.`
+        : w.modality === "vision"
+          ? `After EDA + CV lock: extract pretrained backbone embeddings (ConvNeXt / ViT) and train a linear/LightGBM head before fine-tuning a heavy net. Starter track: ${labels.baseline} on frozen features.`
+          : w.modality === "sequential"
+            ? `After EDA + CV lock: build rolling-window aggregates (count_last_24h, mean_last_7d) and beat them with ${labels.baseline}. Only then test a small GRU / lightweight Transformer if you have millions of sequences.`
+            : `Run out-of-the-box ${labels.baseline} on raw features (CPU, ~15–60s). Record OOF score + feature importances. A single column with ~0.99 importance is a leakage alarm — stop and fix CV/features.`;
+    return [
+      {
+        title: "Stage 1 — EDA & data hygiene",
+        priority: 10,
+        plan: `Inspect shape, dtypes, target rate, missingness, outliers, and corrupted timestamps before any model code.\nVenue: ${labels.venue}.\nModality: ${labels.modality}.\n${
+          isKaggle
+            ? "Confirm train/test schema parity and synthetic quirks."
+            : "Also audit how the label was created (e.g. chargeback lag) so leakage does not hide in the definition."
+        }`,
+      },
+      {
+        title: "Stage 2 — Lock leak-free validation",
+        priority: 20,
+        plan: `Chosen split: ${labels.validation}.\nDo not change folds/random_state casually after this stage — it is the yardstick for every later claim.\n${
+          isKaggle
+            ? "Use stratified folds so each fold mirrors the target rate on static contest data."
+            : "Prefer time-based train/valid/test plus group integrity (same customer/entity stays in one split)."
+        }`,
+      },
+      {
+        title: "Stage 3 — 60-second dumb baseline",
+        priority: 30,
+        plan: baselinePlan,
+      },
+      {
+        title: "Stage 4 — Domain feature engineering",
+        priority: 40,
+        plan: `Create ratios, velocities, historical rates (OOF target encoding), and interactions. Keep a feature only if it beats Stage 3 on the locked validation split. ~80% of real gains usually live here — not in a bigger neural net.`,
+      },
+      {
+        title: isKaggle
+          ? "Stage 5 — Kaggle squeeze path (final 40%)"
+          : "Stage 5 — Commercial deploy path (final 40%)",
+        priority: 50,
+        plan: isKaggle
+          ? `Primary goal: squeeze every 0.1 bps on a static test file.\nExpect diverse ensembles (LGBM/XGB/CatBoost/linear/MLP) and careful stacking only after Stages 1–4 are solid.\nUse LLMs/GPT even on numeric columns only when the dataset is known synthetic-from-NN — never as Step 1.`
+          : `Primary goal: reliable ROI, fast inference, maintainability, explainability.\nPrefer 1–2 fast calibrated models (usually tuned LightGBM/CatBoost + Platt).\nUse LLMs only when a column is real human text (chat, receipts, emails). Next: API deploy, drift alerts, dollar thresholds.`,
+      },
+    ];
+  }
+
+  function buildPlaybookNote(w) {
+    const labels = playbookLabels(w);
+    return [
+      "Playbook locked at project create:",
+      `• Venue: ${labels.venue}`,
+      `• Modality: ${labels.modality}`,
+      `• Validation: ${labels.validation}`,
+      `• Baseline: ${labels.baseline}`,
+      `• Goal threshold: ${w.threshold}`,
+      "Order: EDA → CV lock → dumb baseline → domain features → path split. Do not start with a heavy DL/GPT model.",
+    ].join("\n");
+  }
+
+  async function seedProjectPlaybook(projectId, w) {
+    if (w.seedRoadmap === false) return;
+    const strategies = buildPlaybookRoadmap(w);
+    for (const s of strategies) {
+      await api("/v1/projects/" + projectId + "/roadmap", {
+        method: "POST",
+        body: JSON.stringify({
+          title: s.title,
+          plan: s.plan,
+          priority: s.priority,
+          status: "planned",
+        }),
+      });
+    }
+    await api("/v1/projects/" + projectId + "/progress", {
+      method: "POST",
+      body: JSON.stringify({ note: buildPlaybookNote(w) }),
+    });
+  }
+
+  function captureWizardFields() {
+    const w = state.wizard || defaultWizard();
+    const nameEl = document.getElementById("wiz-name");
+    const thrEl = document.getElementById("wiz-threshold");
+    const kaggleEl = document.getElementById("wiz-kaggle");
+    const gitEl = document.getElementById("wiz-git");
+    const seedEl = document.getElementById("wiz-seed-roadmap");
+    if (nameEl) w.name = nameEl.value.trim();
+    if (thrEl) w.threshold = thrEl.value.trim();
+    if (kaggleEl) w.kaggle = kaggleEl.value.trim();
+    if (gitEl) w.git = gitEl.value.trim();
+    if (seedEl) w.seedRoadmap = !!seedEl.checked;
+    const kind = document.querySelector('input[name="wiz-kind"]:checked');
+    const modality = document.querySelector('input[name="wiz-modality"]:checked');
+    const validation = document.querySelector('input[name="wiz-validation"]:checked');
+    const baseline = document.querySelector('input[name="wiz-baseline"]:checked');
+    if (kind) w.kind = kind.value;
+    if (modality) w.modality = modality.value;
+    if (validation) w.validation = validation.value;
+    if (baseline) w.baseline = baseline.value;
+    state.wizard = w;
+    return w;
+  }
+
+  function renderWizard() {
+    showChrome("studio");
+    if (!state.wizard) state.wizard = defaultWizard();
+    const w = state.wizard;
+    const steps = wizardSteps();
+    const stepName = steps[w.step] || "venue";
+    const meta = wizardStepMeta(stepName);
+    let panel = "";
+
+    if (stepName === "venue") {
       panel = `
-<label class="studio-label" for="wiz-name">Name</label>
-<input class="studio-input" id="wiz-name" value="${escText(w.name || "")}" placeholder="playground-cc" />
-<label class="studio-label" for="wiz-kind">Kind</label>
-<select class="studio-input" id="wiz-kind">
-  <option value="standalone"${w.kind === "standalone" ? " selected" : ""}>standalone</option>
-  <option value="kaggle"${w.kind === "kaggle" ? " selected" : ""}>kaggle</option>
-</select>`;
-    } else if (stepName === "goals") {
+<label class="studio-label" for="wiz-name">Project name</label>
+<input class="studio-input" id="wiz-name" value="${escText(w.name || "")}" placeholder="e.g. playground-cc or fraud-v3" autocomplete="off" />
+<p class="studio-label mt-4">Venue</p>
+<div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Venue">
+  ${wizardChoice("wiz-kind", "standalone", w.kind, "Commercial / real-world", "ROI, latency, drift, explainability. Time + group CV later.")}
+  ${wizardChoice("wiz-kind", "kaggle", w.kind, "Kaggle competition", "Static test file. Stratified CV. Final 40% is LB squeeze.")}
+</div>`;
+    } else if (stepName === "modality") {
+      panel = `
+<p class="mb-3 text-sm text-mist-400">This only sets the recommended baseline family. You still start with EDA and a locked CV.</p>
+<div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Data modality">
+  ${wizardChoice("wiz-modality", "tabular", w.modality, "Structured tabular", "Rows & columns → LightGBM / XGB / CatBoost + linear. 99% of commercial tabular stops here.")}
+  ${wizardChoice("wiz-modality", "text", w.modality, "Text / documents", "Chat, tickets, code → DeBERTa / embeddings after a linear baseline.")}
+  ${wizardChoice("wiz-modality", "vision", w.modality, "Images / video / audio", "Start with pretrained backbones + a light head, not a scratch CNN.")}
+  ${wizardChoice("wiz-modality", "sequential", w.modality, "Sequential events", "Rolling-window tree features first; sequence nets only if volume justifies it.")}
+</div>`;
+    } else if (stepName === "validation") {
+      panel = `
+<p class="mb-3 text-sm text-mist-400">The single most important step. Suggested default follows your venue — change only with a reason.</p>
+<div class="grid gap-2" role="radiogroup" aria-label="Validation strategy">
+  ${wizardChoice("wiz-validation", "skf5", w.validation, "5-fold StratifiedKFold", "Best default for static / synthetic Kaggle tables with a rare target.")}
+  ${wizardChoice("wiz-validation", "time_group", w.validation, "Time holdout + group split", "Best default for live commercial streams — no future peeking, entities stay intact.")}
+  ${wizardChoice("wiz-validation", "group_kfold", w.validation, "GroupKFold", "When leakage is entity-level but time is weak (use mymlfw.cv.run_oof).")}
+</div>`;
+    } else if (stepName === "baseline") {
       const def = w.kind === "kaggle" ? "0.70" : "0.30";
       panel = `
-<p class="text-sm text-mist-400">Maps to ${w.kind === "kaggle" ? "kaggle_public / public_score" : "notebook_score / cv_mean"}.</p>
-<label class="studio-label" for="wiz-threshold">Threshold to beat</label>
-<input class="studio-input" id="wiz-threshold" value="${escText(w.threshold || def)}" />`;
+<p class="mb-3 text-sm text-mist-400">No GPU. No GPT. Get a 60-second score to beat, then engineer features against the locked CV.</p>
+<div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Baseline model">
+  ${wizardChoice("wiz-baseline", "lightgbm", w.baseline, "LightGBM", "Default for tabular — fast CPU, strong importances.")}
+  ${wizardChoice("wiz-baseline", "logistic", w.baseline, "Logistic / Ridge", "Strong dumb baseline; great first pass on sparse / text embeddings.")}
+  ${wizardChoice("wiz-baseline", "xgboost", w.baseline, "XGBoost", "Use when LGBM parity checks or library constraints require it.")}
+  ${wizardChoice("wiz-baseline", "catboost", w.baseline, "CatBoost", "Strong with high-cardinality categoricals.")}
+</div>
+<label class="studio-label mt-4" for="wiz-threshold">Primary goal threshold to beat</label>
+<input class="studio-input" id="wiz-threshold" value="${escText(w.threshold || def)}" inputmode="decimal" />
+<p class="mt-1 text-xs text-mist-500">Maps to ${
+        w.kind === "kaggle" ? "kaggle_public / public_score" : "notebook_score / cv_mean"
+      }.</p>`;
     } else if (stepName === "link") {
-      if (w.kind === "kaggle") {
-        panel = `
+      panel =
+        w.kind === "kaggle"
+          ? `
 <label class="studio-label" for="wiz-kaggle">Kaggle competition slug</label>
-<input class="studio-input" id="wiz-kaggle" value="${escText(w.kaggle || "")}" placeholder="playground-series-s6e11" />
+<input class="studio-input" id="wiz-kaggle" value="${escText(w.kaggle || "")}" placeholder="playground-series-s6e11" autocomplete="off" />
 <label class="studio-label" for="wiz-git">Git remote (optional)</label>
-<input class="studio-input" id="wiz-git" value="${escText(w.git || "")}" />`;
-      } else {
-        panel = `
+<input class="studio-input" id="wiz-git" value="${escText(w.git || "")}" placeholder="https://github.com/org/repo.git" />`
+          : `
 <label class="studio-label" for="wiz-git">Git remote (optional)</label>
-<input class="studio-input" id="wiz-git" value="${escText(w.git || "")}" />`;
-      }
+<input class="studio-input" id="wiz-git" value="${escText(w.git || "")}" placeholder="https://github.com/org/repo.git" />
+<p class="mt-2 text-sm text-mist-400">You can link git later from Ops. No Kaggle slug for commercial projects.</p>`;
     } else {
+      const labels = playbookLabels(w);
+      const roadmap = buildPlaybookRoadmap(w);
       panel = `
-<pre class="overflow-x-auto rounded-lg border border-ink-700 bg-ink-800 p-3 font-mono text-xs text-mist-200">name: ${escText(w.name)}
-kind: ${escText(w.kind)}
-threshold: ${escText(w.threshold)}
-kaggle: ${escText(w.kaggle || "(none)")}
-git: ${escText(w.git || "(none)")}</pre>`;
+<div class="rounded-xl border border-ink-700 bg-ink-950/50 p-4">
+  <dl class="grid gap-2 text-sm sm:grid-cols-2">
+    <div><dt class="text-mist-500">Name</dt><dd class="font-medium text-signal">${escText(w.name || "—")}</dd></div>
+    <div><dt class="text-mist-500">Venue</dt><dd class="text-mist-200">${escText(labels.venue)}</dd></div>
+    <div><dt class="text-mist-500">Modality</dt><dd class="text-mist-200">${escText(labels.modality)}</dd></div>
+    <div><dt class="text-mist-500">Validation</dt><dd class="text-mist-200">${escText(labels.validation)}</dd></div>
+    <div><dt class="text-mist-500">Baseline</dt><dd class="text-mist-200">${escText(labels.baseline)}</dd></div>
+    <div><dt class="text-mist-500">Threshold</dt><dd class="tabular-nums text-mist-200">${escText(w.threshold)}</dd></div>
+    <div><dt class="text-mist-500">Kaggle</dt><dd class="font-mono text-xs text-mist-300">${escText(w.kaggle || "—")}</dd></div>
+    <div><dt class="text-mist-500">Git</dt><dd class="font-mono text-xs text-mist-300">${escText(w.git || "—")}</dd></div>
+  </dl>
+</div>
+<label class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-ink-700 bg-ink-950/40 p-3">
+  <input type="checkbox" id="wiz-seed-roadmap" class="mt-1" ${w.seedRoadmap !== false ? "checked" : ""} />
+  <span>
+    <span class="block text-sm font-medium text-signal">Seed Stages 1–5 on Roadmap</span>
+    <span class="mt-0.5 block text-xs text-mist-400">EDA → CV lock → dumb baseline → features → ${
+      w.kind === "kaggle" ? "Kaggle squeeze" : "commercial deploy"
+    } path.</span>
+  </span>
+</label>
+<ol class="mt-4 space-y-2 text-xs text-mist-400">
+  ${roadmap
+    .map(
+      (s, i) =>
+        `<li class="rounded-lg border border-ink-800 px-3 py-2"><span class="text-mist-500">${i + 1}.</span> ${escText(s.title)}</li>`
+    )
+    .join("")}
+</ol>`;
     }
+
     const isLast = w.step >= steps.length - 1;
     const stepPct = ((w.step + 1) / steps.length) * 100;
+    const stepper = steps
+      .map((id, i) => {
+        const m = wizardStepMeta(id);
+        const done = i < w.step;
+        const current = i === w.step;
+        const cls = current
+          ? "border-signal/40 bg-signal/10 text-signal"
+          : done
+            ? "border-ink-600 bg-ink-800 text-mist-200"
+            : "border-ink-800 bg-transparent text-mist-500";
+        return `<li class="rounded-md border px-2 py-1 text-[11px] uppercase tracking-[0.08em] ${cls}">${escText(m.label)}</li>`;
+      })
+      .join("");
+    const labels = playbookLabels(w);
     const body = `
-<section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+<section class="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
   <div>
-    <div class="mb-6">
-      <h1 class="text-3xl font-semibold tracking-tight text-signal">New project</h1>
-      <p class="mt-1 text-sm text-mist-400">Step ${escText(stepName)} · ${w.step + 1}/${steps.length}</p>
-      <div class="mt-4 h-2 overflow-hidden rounded-full bg-ink-800">
-        <div class="h-full bg-signal" style="width:${stepPct}%"></div>
+    <div class="mb-5">
+      <p class="text-xs uppercase tracking-[0.14em] text-mist-500">New project · playbook wizard</p>
+      <h1 class="mt-1 text-3xl font-semibold tracking-tight text-signal">${escText(meta.title)}</h1>
+      <p class="mt-1 text-sm text-mist-400">Step ${w.step + 1} of ${steps.length} · never start with a heavy model</p>
+      <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-ink-800" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(stepPct)}">
+        <div class="h-full bg-signal transition-[width] duration-300" style="width:${stepPct}%"></div>
       </div>
+      <ol class="mt-3 flex flex-wrap gap-1.5">${stepper}</ol>
     </div>
     <form id="wizard-form" class="studio-card space-y-1">${panel}
-      <div class="flex flex-wrap gap-2 pt-5">
+      <div class="flex flex-wrap items-center gap-2 pt-5">
         <button type="button" class="studio-ghost" id="wiz-cancel">Cancel</button>
         ${w.step > 0 ? `<button type="button" class="studio-ghost" id="wiz-back">Back</button>` : ""}
-        <button type="submit" class="studio-cta ml-auto">${isLast ? "Create" : "Continue"}</button>
+        <button type="submit" class="studio-cta ml-auto" id="wiz-next">${isLast ? "Create project" : "Continue"}</button>
       </div>
     </form>
   </div>
-  <aside class="studio-card h-fit">
-    <h2 class="mb-2 text-sm font-medium text-signal">Best practice</h2>
-    <p class="text-sm leading-relaxed text-mist-400">${escText(tips[stepName] || "")}</p>
-    <div class="mt-4">
-      ${chartsBarRows([
-        { label: "Name", size: w.name ? 1 : 0, display: w.name ? "ok" : "—" },
-        { label: "Goal", size: stepName === "kind" ? 0 : 1, display: stepName === "kind" ? "—" : "ok" },
-        { label: "Link", size: ["link", "review"].includes(stepName) ? 1 : 0, display: ["link", "review"].includes(stepName) ? "ok" : "—" },
-        { label: "Create", size: stepName === "review" ? 1 : 0, display: stepName === "review" ? "ready" : "—" },
-      ])}
+  <aside class="studio-card h-fit lg:sticky lg:top-4">
+    <h2 class="mb-2 text-sm font-medium text-signal">Expert coach</h2>
+    <p class="text-sm leading-relaxed text-mist-300">${escText(wizardCoach(w, stepName))}</p>
+    <div class="mt-4 border-t border-ink-700 pt-3 text-xs text-mist-500 space-y-1.5">
+      <div><span class="text-mist-400">Venue</span> · ${escText(labels.venue)}</div>
+      <div><span class="text-mist-400">Data</span> · ${escText(labels.modality)}</div>
+      <div><span class="text-mist-400">CV</span> · ${escText(labels.validation)}</div>
+      <div><span class="text-mist-400">Baseline</span> · ${escText(labels.baseline)}</div>
     </div>
   </aside>
 </section>`;
@@ -793,51 +1071,78 @@ git: ${escText(w.git || "(none)")}</pre>`;
     bindShell(() => {
       document.getElementById("wiz-cancel").onclick = () => {
         state.error = "";
+        state.wizard = null;
         setRoute("studio");
       };
       const back = document.getElementById("wiz-back");
       if (back) {
         back.onclick = () => {
+          captureWizardFields();
           state.wizard.step = Math.max(0, (state.wizard.step || 0) - 1);
+          state.error = "";
           renderWizard();
         };
       }
+      document.querySelectorAll('input[name="wiz-kind"]').forEach((el) => {
+        el.onchange = () => {
+          captureWizardFields();
+          applyVenueDefaults(state.wizard);
+          renderWizard();
+        };
+      });
+      document.querySelectorAll('input[name="wiz-modality"]').forEach((el) => {
+        el.onchange = () => {
+          captureWizardFields();
+          if (state.wizard.modality === "text") state.wizard.baseline = "logistic";
+          if (state.wizard.modality === "tabular") state.wizard.baseline = "lightgbm";
+          if (state.wizard.modality === "vision" || state.wizard.modality === "sequential") {
+            state.wizard.baseline = "lightgbm";
+          }
+          renderWizard();
+        };
+      });
       document.getElementById("wizard-form").onsubmit = async (ev) => {
         ev.preventDefault();
-        const nameEl = document.getElementById("wiz-name");
-        const kindEl = document.getElementById("wiz-kind");
-        const thrEl = document.getElementById("wiz-threshold");
-        const kaggleEl = document.getElementById("wiz-kaggle");
-        const gitEl = document.getElementById("wiz-git");
-        if (nameEl) state.wizard.name = nameEl.value.trim();
-        if (kindEl) state.wizard.kind = kindEl.value;
-        if (thrEl) state.wizard.threshold = thrEl.value.trim();
-        if (kaggleEl) state.wizard.kaggle = kaggleEl.value.trim();
-        if (gitEl) state.wizard.git = gitEl.value.trim();
-        if (state.wizard.step === 0 && !state.wizard.name) {
-          state.error = "enter a project name";
+        const nextBtn = document.getElementById("wiz-next");
+        const cur = captureWizardFields();
+        const stepsNow = wizardSteps();
+        const name = stepsNow[cur.step] || "venue";
+
+        if (name === "venue" && !cur.name) {
+          state.error = "Enter a project name";
           renderWizard();
           return;
         }
-        if (state.wizard.step < steps.length - 1) {
-          state.wizard.step += 1;
-          if (state.wizard.step === 1 && !state.wizard.threshold) {
-            state.wizard.threshold = state.wizard.kind === "kaggle" ? "0.70" : "0.30";
+        if (name === "baseline") {
+          const threshold = Number(cur.threshold);
+          if (!Number.isFinite(threshold)) {
+            state.error = "Threshold must be a number";
+            renderWizard();
+            return;
           }
+        }
+        if (cur.step < stepsNow.length - 1) {
+          cur.step += 1;
+          if (name === "venue") applyVenueDefaults(cur);
+          state.wizard = cur;
           state.error = "";
           renderWizard();
           return;
         }
-        const threshold = Number(state.wizard.threshold);
+
+        const threshold = Number(cur.threshold);
         if (!Number.isFinite(threshold)) {
-          state.error = "threshold must be a number";
+          state.error = "Threshold must be a number";
+          cur.step = stepsNow.indexOf("baseline");
+          state.wizard = cur;
           renderWizard();
           return;
         }
-        const kind = state.wizard.kind === "kaggle" ? "kaggle" : "standalone";
-        if (kind === "kaggle" && !String(state.wizard.kaggle || "").trim()) {
-          state.error = "kaggle competition slug is required";
-          state.wizard.step = 2;
+        const kind = cur.kind === "kaggle" ? "kaggle" : "standalone";
+        if (kind === "kaggle" && !String(cur.kaggle || "").trim()) {
+          state.error = "Kaggle competition slug is required";
+          cur.step = stepsNow.indexOf("link");
+          state.wizard = cur;
           renderWizard();
           return;
         }
@@ -858,21 +1163,37 @@ git: ${escText(w.git || "(none)")}</pre>`;
                 direction: "maximize",
               };
         try {
+          if (nextBtn) {
+            nextBtn.disabled = true;
+            nextBtn.textContent = "Creating…";
+          }
           const created = await api("/v1/projects", {
             method: "POST",
             body: JSON.stringify({
-              name: state.wizard.name,
+              name: cur.name,
               kind,
               goals: [goal],
-              kaggle_competition: state.wizard.kaggle || "",
-              git_remote: state.wizard.git || "",
+              kaggle_competition: cur.kaggle || "",
+              git_remote: cur.git || "",
             }),
           });
+          try {
+            await seedProjectPlaybook(created.id, cur);
+          } catch (seedErr) {
+            state.notice =
+              "Created " +
+              created.slug +
+              " (playbook seed partial: " +
+              String(seedErr.message || seedErr) +
+              ")";
+          }
           await loadStudio();
-          state.notice = "Created " + created.slug;
+          if (!state.notice) state.notice = "Created " + created.slug + " · Stages 1–5 seeded";
           state.error = "";
-          state.mode = "BRAIN";
-          setRoute("studio/" + created.id + "/brain");
+          state.wizard = null;
+          state.mode = "ROADMAP";
+          state.roadmapFilter = "planned";
+          setRoute("studio/" + created.id + "/roadmap");
         } catch (e) {
           state.error = String(e.message || e);
           renderWizard();

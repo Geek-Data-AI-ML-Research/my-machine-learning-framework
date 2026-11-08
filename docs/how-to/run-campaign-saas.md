@@ -31,6 +31,10 @@ Host ports below avoid common clashes with other local Compose projects (e.g. Ir
 
 MCP shares Mongo with the API. Mint a PAT in Studio **Settings → Agent PAT**, then point Cursor/Claude at `http://127.0.0.1:8100/mcp` with `Authorization: Bearer <pat>`. Playbook: [Keep a Studio project updated via MCP](agent-mcp-campaign-sync.md).
 
+### New project (DS playbook wizard)
+
+In Studio home click **New project**. The wizard locks venue (Kaggle vs commercial), data modality, leak-free CV, and a fast baseline, then seeds Roadmap Stages 1–5 (EDA → CV → baseline → features → path split). Details: [Start a Studio project with the DS playbook wizard](studio-new-project-wizard.md).
+
 Stop with `make down`. In Docker Desktop → Containers, expand the **mymlfw** project group.
 
 ## Kaggle sync (optional)

@@ -28,7 +28,7 @@ Durability (when URIs set): project data via Mongo `ProjectScopedDB`; Idempotenc
 | --- | --- | --- | --- | --- |
 | Ensure demo | TTV | `POST /v1/studio/ensure-demo` | after login | ok |
 | List / filter / search | Studio home | `GET /v1/projects` | `#studio` | ok |
-| New project wizard | New project | `POST /v1/projects` | `#studio/new` | ok |
+| New project wizard | New project | `POST /v1/projects` (+ optional roadmap/progress seed) | `#studio/new` DS playbook | ok |
 | Invite | Invite | `POST /v1/projects/{id}/invite` | list + TRUST | ok |
 | Archive | Soft-delete | `POST /v1/projects/{id}/archive` | list Archive | ok |
 | Share from list | Share | `POST /v1/projects/{id}/share` | list Share | ok |

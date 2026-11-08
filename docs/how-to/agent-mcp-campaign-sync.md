@@ -106,7 +106,7 @@ Only when org `feature_flags.cloud_runners` is on (owner API). Use MCP prompt `c
 | Need | Use instead |
 | --- | --- |
 | Live Kaggle LB / submissions pull | Studio Kaggle → Sync, or `POST /v1/projects/{id}/kaggle/refresh` with human session / project token |
-| Create project / goals | Studio New project wizard or `POST /v1/projects` |
+| Create project / goals | Studio **New project** DS playbook wizard (`#studio/new`) or `POST /v1/projects`; wizard optionally seeds Roadmap Stages 1–5 + a progress note ([how-to](studio-new-project-wizard.md)) |
 | Flip org feature flags | Owner `PATCH /v1/orgs/current/feature-flags` — MCP must not elevate |
 | Confirm human elicitation | Web session / Passkey / TOTP — never PAT |
 

@@ -28,6 +28,7 @@ Task-oriented. Each page assumes the tutorial is done.
 - [Blend and gate a submission](how-to/blend-and-gate.md)
 - [Remember, ingest, and search](how-to/use-memory.md)
 - [Run the Campaign SaaS stack](how-to/run-campaign-saas.md)
+- [Start a Studio project with the DS playbook wizard](how-to/studio-new-project-wizard.md)
 - [Connect cloud runners (RunPod / AWS)](how-to/connect-cloud-runners.md)
 - [MCP walking skeleton](how-to/mcp-walking-skeleton.md)
 - [Keep a Studio project updated via MCP](how-to/agent-mcp-campaign-sync.md)

@@ -78,6 +78,8 @@ curl -s -X POST http://127.0.0.1:8001/v1/auth/register \
 
 Save `access_token` from the response. Demo campaign data is seeded after login.
 
+**New project:** Studio home → **New project** runs the DS playbook wizard (venue → modality → CV → baseline → links) and can seed Roadmap Stages 1–5. How-to: [studio-new-project-wizard.md](docs/how-to/studio-new-project-wizard.md).
+
 ### Agent MCP
 
 1. In Studio: **Settings → Agent PAT** — mint a PAT
