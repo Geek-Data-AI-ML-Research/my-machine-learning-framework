@@ -22,6 +22,7 @@ from mymlfw.saas.schemas import (
     LeverCloseRequest,
     LeverListResponse,
     MissionListResponse,
+    PlaybookCatalogResponse,
     ProgressNoteCreate,
     ProgressNoteListResponse,
     ProgressNoteResponse,
@@ -75,6 +76,23 @@ async def _lookup_invitee_user_id(request: Request, email: str) -> str | None:
         user = await auth_data.get_user_by_email(mongo, email)
         return None if user is None else str(user["_id"])
     return AUTH_STORE.by_email.get(email.lower())
+
+
+@router.get("/v1/playbook/catalog", response_model=PlaybookCatalogResponse)
+async def get_playbook_catalog(
+    principal: Annotated[dict[str, Any], Depends(get_current_principal)],
+    modality: str = "tabular",
+    kind: str = "standalone",
+) -> PlaybookCatalogResponse:
+    """DS strategy ladder + paradigm shifts (shared with ``mymlfw playbook`` CLI)."""
+    del principal  # auth gate only — catalog is org-agnostic
+    from mymlfw.playbook import playbook_catalog
+
+    try:
+        payload = playbook_catalog(modality=modality, kind=kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PlaybookCatalogResponse.model_validate(payload)
 
 
 @router.get("/v1/settings", response_model=SettingsResponse)

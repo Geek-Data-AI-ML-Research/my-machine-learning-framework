@@ -33,6 +33,9 @@
     autopilot: null,
     accounts: null,
     wizard: null,
+    playbookCatalog: null,
+    playbookCatalogKey: "",
+    playbookCatalogLoading: false,
     settings: null,
     inviteFor: null,
     inviteEmail: "",
@@ -715,6 +718,7 @@
       validation: "time_group",
       baseline: "lightgbm",
       threshold: "0.30",
+      paradigmShifts: [],
       kaggle: "",
       git: "",
       seedRoadmap: true,
@@ -722,7 +726,7 @@
   }
 
   function wizardSteps() {
-    return ["venue", "modality", "validation", "baseline", "link", "review"];
+    return ["venue", "modality", "validation", "baseline", "strategies", "link", "review"];
   }
 
   function wizardStepMeta(id) {
@@ -731,10 +735,59 @@
       modality: { label: "Data", title: "What does the data look like?" },
       validation: { label: "CV", title: "Lock a leak-free validation split" },
       baseline: { label: "Baseline", title: "Start with a fast dumb baseline" },
+      strategies: { label: "Strategies", title: "Modality ladder & paradigm shifts" },
       link: { label: "Links", title: "Connect competition or git" },
       review: { label: "Create", title: "Review playbook & create" },
     };
     return map[id] || { label: id, title: id };
+  }
+
+  /** Shared with ``python -m mymlfw playbook`` via GET /v1/playbook/catalog. */
+  async function ensurePlaybookCatalog(w, force) {
+    const modality = (w && w.modality) || "tabular";
+    const kind = (w && w.kind) || "standalone";
+    const key = modality + "|" + kind;
+    if (!force && state.playbookCatalog && state.playbookCatalogKey === key) {
+      return state.playbookCatalog;
+    }
+    const cat = await api(
+      "/v1/playbook/catalog?modality=" +
+        encodeURIComponent(modality) +
+        "&kind=" +
+        encodeURIComponent(kind)
+    );
+    state.playbookCatalog = cat;
+    state.playbookCatalogKey = key;
+    return cat;
+  }
+
+  function modalityStrategyCatalog(modality) {
+    const cat = state.playbookCatalog;
+    if (cat && cat.strategies_by_modality && cat.strategies_by_modality[modality]) {
+      return cat.strategies_by_modality[modality];
+    }
+    if (cat && cat.modality === modality && Array.isArray(cat.strategies)) {
+      return cat.strategies;
+    }
+    return [];
+  }
+
+  function paradigmShiftCatalog(w) {
+    const cat = state.playbookCatalog;
+    const venue = w.kind === "kaggle" ? "kaggle" : "standalone";
+    const source =
+      cat && Array.isArray(cat.all_paradigm_shifts)
+        ? cat.all_paradigm_shifts
+        : cat && Array.isArray(cat.paradigm_shifts)
+          ? cat.paradigm_shifts
+          : [];
+    return source.filter((s) => {
+      const venues = s.venues || [];
+      if (venues.length && venues.indexOf(venue) < 0) return false;
+      const when = s.when || "any";
+      if (when !== "any" && when !== w.modality) return false;
+      return true;
+    });
   }
 
   function wizardCoach(w, stepName) {
@@ -749,12 +802,14 @@
           : "Live commercial data: prefer time-based holdout plus group splits (same customer/entity stays in one split) so you never peek into the future.",
       baseline:
         "Run an out-of-the-box LightGBM / Logistic / XGB on raw features on CPU (15–60s). You get a score to beat and a feature-importance leak alarm (e.g. 0.99 importance on one column).",
+      strategies:
+        "The ladder is ordered: default → escalate → paradigm. Tick only paradigm shifts that might apply later — they seed optional roadmap items after Stages 1–5, never replace EDA/CV/baseline.",
       link:
         w.kind === "kaggle"
           ? "Paste the exact competition slug from the Kaggle URL. Seal API tokens later under Kaggle — never in the project name."
           : "Git is optional at create time. Link from Ops when the repo exists.",
       review:
-        "Create writes the project under your org and seeds Stages 1–5 on the Roadmap so agents start with EDA, not GPT.",
+        "Create writes the project under your org and seeds Stages 1–5 (+ selected paradigm shifts) on the Roadmap so agents start with EDA, not GPT.",
     };
     return coaches[stepName] || "";
   }
@@ -806,12 +861,24 @@
       xgboost: "XGBoost",
       catboost: "CatBoost",
     };
+    const shifts = paradigmShiftCatalog(w).filter(
+      (s) => (w.paradigmShifts || []).indexOf(s.id) >= 0
+    );
     return {
       venue: w.kind === "kaggle" ? "Kaggle competition" : "Commercial / standalone",
       modality: modality[w.modality] || w.modality,
       validation: validation[w.validation] || w.validation,
       baseline: baseline[w.baseline] || w.baseline,
+      shifts: shifts,
+      strategies: modalityStrategyCatalog(w.modality),
     };
+  }
+
+  function strategyLadderPlan(w) {
+    const ladder = modalityStrategyCatalog(w.modality);
+    return ladder
+      .map((s) => `• [${s.tier}] ${s.title} — ${s.detail}`)
+      .join("\n");
   }
 
   function buildPlaybookRoadmap(w) {
@@ -825,7 +892,7 @@
           : w.modality === "sequential"
             ? `After EDA + CV lock: build rolling-window aggregates (count_last_24h, mean_last_7d) and beat them with ${labels.baseline}. Only then test a small GRU / lightweight Transformer if you have millions of sequences.`
             : `Run out-of-the-box ${labels.baseline} on raw features (CPU, ~15–60s). Record OOF score + feature importances. A single column with ~0.99 importance is a leakage alarm — stop and fix CV/features.`;
-    return [
+    const items = [
       {
         title: "Stage 1 — EDA & data hygiene",
         priority: 10,
@@ -859,15 +926,34 @@
           ? "Stage 5 — Kaggle squeeze path (final 40%)"
           : "Stage 5 — Commercial deploy path (final 40%)",
         priority: 50,
-        plan: isKaggle
-          ? `Primary goal: squeeze every 0.1 bps on a static test file.\nExpect diverse ensembles (LGBM/XGB/CatBoost/linear/MLP) and careful stacking only after Stages 1–4 are solid.\nUse LLMs/GPT even on numeric columns only when the dataset is known synthetic-from-NN — never as Step 1.`
-          : `Primary goal: reliable ROI, fast inference, maintainability, explainability.\nPrefer 1–2 fast calibrated models (usually tuned LightGBM/CatBoost + Platt).\nUse LLMs only when a column is real human text (chat, receipts, emails). Next: API deploy, drift alerts, dollar thresholds.`,
+        plan:
+          (isKaggle
+            ? `Primary goal: squeeze every 0.1 bps on a static test file.\nExpect diverse ensembles (LGBM/XGB/CatBoost/linear/MLP) and careful stacking only after Stages 1–4 are solid.\nUse LLMs/GPT even on numeric columns only when the dataset is known synthetic-from-NN — never as Step 1.`
+            : `Primary goal: reliable ROI, fast inference, maintainability, explainability.\nPrefer 1–2 fast calibrated models (usually tuned LightGBM/CatBoost + Platt).\nUse LLMs only when a column is real human text (chat, receipts, emails). Next: API deploy, drift alerts, dollar thresholds.`) +
+          `\n\nModality strategy ladder (${labels.modality}):\n${strategyLadderPlan(w)}`,
       },
     ];
+    const selected = paradigmShiftCatalog(w).filter(
+      (s) => (w.paradigmShifts || []).indexOf(s.id) >= 0
+    );
+    selected.forEach((s, i) => {
+      items.push({
+        title: "Paradigm shift — " + s.title,
+        priority: 60 + i * 10,
+        plan: `${s.detail}\n\nGate: only after Stages 1–3 are executed on locked CV. If it fails Stage-3 beat, mark dead-end and return to the default ladder.\nModality context: ${labels.modality}.`,
+      });
+    });
+    return items;
   }
 
   function buildPlaybookNote(w) {
     const labels = playbookLabels(w);
+    const shiftLines = labels.shifts.length
+      ? labels.shifts.map((s) => `  - ${s.title}`).join("\n")
+      : "  - (none selected)";
+    const ladderLines = labels.strategies
+      .map((s) => `  - [${s.tier}] ${s.title}`)
+      .join("\n");
     return [
       "Playbook locked at project create:",
       `• Venue: ${labels.venue}`,
@@ -875,7 +961,11 @@
       `• Validation: ${labels.validation}`,
       `• Baseline: ${labels.baseline}`,
       `• Goal threshold: ${w.threshold}`,
-      "Order: EDA → CV lock → dumb baseline → domain features → path split. Do not start with a heavy DL/GPT model.",
+      "• Strategy ladder:",
+      ladderLines,
+      "• Paradigm shifts (optional later):",
+      shiftLines,
+      "Order: EDA → CV lock → dumb baseline → domain features → path split → optional paradigm shifts. Do not start with a heavy DL/GPT model.",
     ].join("\n");
   }
 
@@ -919,6 +1009,10 @@
     if (modality) w.modality = modality.value;
     if (validation) w.validation = validation.value;
     if (baseline) w.baseline = baseline.value;
+    const shiftBoxes = document.querySelectorAll('input[name="wiz-shift"]:checked');
+    if (shiftBoxes.length || document.querySelector('input[name="wiz-shift"]')) {
+      w.paradigmShifts = Array.prototype.map.call(shiftBoxes, (el) => el.value);
+    }
     state.wizard = w;
     return w;
   }
@@ -930,6 +1024,21 @@
     const steps = wizardSteps();
     const stepName = steps[w.step] || "venue";
     const meta = wizardStepMeta(stepName);
+    const needsCatalog = stepName === "strategies" || stepName === "review" || stepName === "baseline";
+    if (needsCatalog && !state.playbookCatalogLoading) {
+      const key = (w.modality || "tabular") + "|" + (w.kind || "standalone");
+      if (state.playbookCatalogKey !== key || !state.playbookCatalog) {
+        state.playbookCatalogLoading = true;
+        ensurePlaybookCatalog(w, true)
+          .catch((e) => {
+            state.error = "Playbook catalog: " + String(e.message || e);
+          })
+          .finally(() => {
+            state.playbookCatalogLoading = false;
+            renderWizard();
+          });
+      }
+    }
     let panel = "";
 
     if (stepName === "venue") {
@@ -973,6 +1082,61 @@
 <p class="mt-1 text-xs text-mist-500">Maps to ${
         w.kind === "kaggle" ? "kaggle_public / public_score" : "notebook_score / cv_mean"
       }.</p>`;
+    } else if (stepName === "strategies") {
+      const ladder = modalityStrategyCatalog(w.modality);
+      const shifts = paradigmShiftCatalog(w);
+      const selected = w.paradigmShifts || [];
+      const tierTone = { default: "text-emerald-300", escalate: "text-amber-200", paradigm: "text-sky-300" };
+      const loading =
+        state.playbookCatalogLoading || (!ladder.length && !state.error)
+          ? `<p class="mb-3 text-sm text-mist-400">Loading shared playbook catalog…</p>`
+          : "";
+      panel = `
+${loading}
+<p class="mb-3 text-sm text-mist-400">Strategy ladder for <span class="text-signal">${escText(
+        playbookLabels(w).modality
+      )}</span> (same source as <code class="inline-code">mymlfw playbook strategies</code>). Climb only after the locked CV baseline is beaten.</p>
+<ul class="mb-5 space-y-2">
+  ${
+    ladder.length
+      ? ladder
+          .map(
+            (s) => `<li class="rounded-xl border border-ink-700 bg-ink-950/50 px-3 py-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-mono text-[10px] uppercase tracking-[0.1em] ${tierTone[s.tier] || "text-mist-400"}">${escText(
+          s.tier
+        )}</span>
+        <span class="text-sm font-medium text-signal">${escText(s.title)}</span>
+      </div>
+      <p class="mt-1 text-xs leading-relaxed text-mist-400">${escText(s.detail)}</p>
+    </li>`
+          )
+          .join("")
+      : `<li class="text-sm text-mist-500">No strategies loaded yet.</li>`
+  }
+</ul>
+<p class="studio-label">Possible paradigm shifts (optional later)</p>
+<p class="mb-2 text-xs text-mist-500">Tick shifts that might apply after Stages 1–3. Each seeds a gated Roadmap item — not a license to skip EDA.</p>
+<div class="grid gap-2">
+  ${
+    shifts.length
+      ? shifts
+          .map((s) => {
+            const on = selected.indexOf(s.id) >= 0;
+            return `<label class="flex cursor-pointer gap-3 rounded-xl border p-3 ${
+              on ? "border-sky-500/40 bg-sky-500/10" : "border-ink-700 bg-ink-950/40 hover:border-ink-500"
+            }">
+      <input type="checkbox" class="mt-1" name="wiz-shift" value="${escText(s.id)}" ${on ? "checked" : ""} />
+      <span class="min-w-0">
+        <span class="block text-sm font-medium text-signal">${escText(s.title)}</span>
+        <span class="mt-0.5 block text-xs leading-relaxed text-mist-400">${escText(s.detail)}</span>
+      </span>
+    </label>`;
+          })
+          .join("")
+      : `<p class="text-sm text-mist-500">No venue-specific shifts for this modality — stay on the default ladder.</p>`
+  }
+</div>`;
     } else if (stepName === "link") {
       panel =
         w.kind === "kaggle"
@@ -997,17 +1161,33 @@
     <div><dt class="text-mist-500">Validation</dt><dd class="text-mist-200">${escText(labels.validation)}</dd></div>
     <div><dt class="text-mist-500">Baseline</dt><dd class="text-mist-200">${escText(labels.baseline)}</dd></div>
     <div><dt class="text-mist-500">Threshold</dt><dd class="tabular-nums text-mist-200">${escText(w.threshold)}</dd></div>
+    <div><dt class="text-mist-500">Paradigm shifts</dt><dd class="text-mist-200">${escText(
+      labels.shifts.length ? labels.shifts.map((s) => s.title).join("; ") : "none"
+    )}</dd></div>
     <div><dt class="text-mist-500">Kaggle</dt><dd class="font-mono text-xs text-mist-300">${escText(w.kaggle || "—")}</dd></div>
     <div><dt class="text-mist-500">Git</dt><dd class="font-mono text-xs text-mist-300">${escText(w.git || "—")}</dd></div>
   </dl>
+  <div class="mt-4 border-t border-ink-700 pt-3">
+    <p class="text-[10px] uppercase tracking-[0.12em] text-mist-500">Modality ladder</p>
+    <ul class="mt-2 space-y-1 text-xs text-mist-400">
+      ${labels.strategies
+        .map(
+          (s) =>
+            `<li><span class="text-mist-500">[${escText(s.tier)}]</span> ${escText(s.title)}</li>`
+        )
+        .join("")}
+    </ul>
+  </div>
 </div>
 <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-ink-700 bg-ink-950/40 p-3">
   <input type="checkbox" id="wiz-seed-roadmap" class="mt-1" ${w.seedRoadmap !== false ? "checked" : ""} />
   <span>
-    <span class="block text-sm font-medium text-signal">Seed Stages 1–5 on Roadmap</span>
+    <span class="block text-sm font-medium text-signal">Seed Stages 1–5${
+      labels.shifts.length ? " + " + labels.shifts.length + " paradigm shift(s)" : ""
+    } on Roadmap</span>
     <span class="mt-0.5 block text-xs text-mist-400">EDA → CV lock → dumb baseline → features → ${
       w.kind === "kaggle" ? "Kaggle squeeze" : "commercial deploy"
-    } path.</span>
+    } path${labels.shifts.length ? " → gated paradigm shifts" : ""}.</span>
   </span>
 </label>
 <ol class="mt-4 space-y-2 text-xs text-mist-400">
@@ -1064,11 +1244,20 @@
       <div><span class="text-mist-400">Data</span> · ${escText(labels.modality)}</div>
       <div><span class="text-mist-400">CV</span> · ${escText(labels.validation)}</div>
       <div><span class="text-mist-400">Baseline</span> · ${escText(labels.baseline)}</div>
+      <div><span class="text-mist-400">Shifts</span> · ${escText(
+        String((w.paradigmShifts || []).length)
+      )} selected</div>
     </div>
   </aside>
 </section>`;
     app.innerHTML = shell("Studio / new", body, "");
     bindShell(() => {
+      function pruneParadigmShifts() {
+        const allowed = new Set(paradigmShiftCatalog(state.wizard).map((s) => s.id));
+        state.wizard.paradigmShifts = (state.wizard.paradigmShifts || []).filter((id) =>
+          allowed.has(id)
+        );
+      }
       document.getElementById("wiz-cancel").onclick = () => {
         state.error = "";
         state.wizard = null;
@@ -1087,6 +1276,8 @@
         el.onchange = () => {
           captureWizardFields();
           applyVenueDefaults(state.wizard);
+          state.playbookCatalogKey = "";
+          pruneParadigmShifts();
           renderWizard();
         };
       });
@@ -1098,6 +1289,8 @@
           if (state.wizard.modality === "vision" || state.wizard.modality === "sequential") {
             state.wizard.baseline = "lightgbm";
           }
+          state.playbookCatalogKey = "";
+          pruneParadigmShifts();
           renderWizard();
         };
       });

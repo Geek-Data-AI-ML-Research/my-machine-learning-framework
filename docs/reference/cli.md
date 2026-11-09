@@ -13,6 +13,10 @@ Flags below are the ones the parser requires or commonly takes. Defaults are the
 | `profile-data --dir DIR` | `--dir` | Writes a profile. `--out` sets the path. `--recommend` is accepted and changes nothing: recommendations are always written. |
 | `recipes --match TEXT` | | Substring match on recipe cards. `ranking` returns the ranking card only. |
 | `recipes --show ID` | | Prints one card. |
+| `playbook strategies --modality MOD` | | Strategy ladder for `tabular` / `text` / `vision` / `sequential`. `--json` for machine output. |
+| `playbook shifts --modality MOD --kind KIND` | | Paradigm shifts filtered by venue (`kaggle` \| `standalone`). |
+| `playbook roadmap --modality MOD --kind KIND` | | Prints Stages 1–5 (+ `--shift ID` repeatable). `--baseline`, `--validation`, `--json`. |
+| `playbook catalog --modality MOD --kind KIND` | | Full JSON catalog (same payload as `GET /v1/playbook/catalog`). |
 | `archive-contest --ledger PATH --playbook PATH` | both paths | Writes `## proven_wins` and `## known_traps`. `--recipe ID` also appends those lists to that card. |
 | `analyze --dir DIR` | `--dir` | Read-only JSON. `--task`, `--db`, `--out`. |
 | `advise --dir DIR` | `--dir` | Git worktree. `--task` defaults to `next experiment`. `--db`, `--clean`, `--id`. |

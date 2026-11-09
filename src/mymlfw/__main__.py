@@ -202,6 +202,71 @@ def _parser() -> argparse.ArgumentParser:
     recipes.add_argument("--match", default="")
     recipes.add_argument("--show", default="")
 
+    playbook = sub.add_parser("playbook", exit_on_error=False)
+    playbook_sub = playbook.add_subparsers(dest="playbook_cmd", required=True)
+    pb_strategies = playbook_sub.add_parser("strategies", exit_on_error=False)
+    pb_strategies.add_argument(
+        "--modality",
+        default="tabular",
+        choices=["tabular", "text", "vision", "sequential"],
+    )
+    pb_strategies.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the strategy ladder as JSON",
+    )
+    pb_shifts = playbook_sub.add_parser("shifts", exit_on_error=False)
+    pb_shifts.add_argument(
+        "--modality",
+        default="tabular",
+        choices=["tabular", "text", "vision", "sequential"],
+    )
+    pb_shifts.add_argument(
+        "--kind",
+        default="standalone",
+        choices=["kaggle", "standalone"],
+    )
+    pb_shifts.add_argument("--json", action="store_true")
+    pb_roadmap = playbook_sub.add_parser("roadmap", exit_on_error=False)
+    pb_roadmap.add_argument(
+        "--modality",
+        default="tabular",
+        choices=["tabular", "text", "vision", "sequential"],
+    )
+    pb_roadmap.add_argument(
+        "--kind",
+        default="standalone",
+        choices=["kaggle", "standalone"],
+    )
+    pb_roadmap.add_argument(
+        "--baseline",
+        default="lightgbm",
+        choices=["lightgbm", "logistic", "xgboost", "catboost"],
+    )
+    pb_roadmap.add_argument(
+        "--validation",
+        default="skf5",
+        choices=["skf5", "time_group", "group_kfold"],
+    )
+    pb_roadmap.add_argument(
+        "--shift",
+        action="append",
+        default=[],
+        help="Paradigm shift id (repeatable)",
+    )
+    pb_roadmap.add_argument("--json", action="store_true")
+    pb_catalog = playbook_sub.add_parser("catalog", exit_on_error=False)
+    pb_catalog.add_argument(
+        "--modality",
+        default="tabular",
+        choices=["tabular", "text", "vision", "sequential"],
+    )
+    pb_catalog.add_argument(
+        "--kind",
+        default="standalone",
+        choices=["kaggle", "standalone"],
+    )
+
     archive = sub.add_parser("archive-contest", exit_on_error=False)
     archive.add_argument("--ledger", required=True)
     archive.add_argument("--playbook", required=True)
@@ -824,6 +889,70 @@ def _dispatch(args) -> int:
         for card in list_recipes(args.match):
             print(f"{card['id']}: {card['summary']}")
         return 0
+    if args.command == "playbook":
+        from mymlfw.playbook import (
+            build_seed_roadmap,
+            modality_strategies,
+            paradigm_shifts,
+            playbook_catalog,
+        )
+
+        if args.playbook_cmd == "strategies":
+            rows = modality_strategies(args.modality)
+            if args.json:
+                print(json.dumps({"modality": args.modality, "strategies": rows}))
+            else:
+                for row in rows:
+                    print(f"[{row['tier']}] {row['id']}: {row['title']}")
+                    print(f"  {row['detail']}")
+            return 0
+        if args.playbook_cmd == "shifts":
+            rows = paradigm_shifts(modality=args.modality, kind=args.kind)
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "modality": args.modality,
+                            "kind": args.kind,
+                            "paradigm_shifts": rows,
+                        }
+                    )
+                )
+            else:
+                for row in rows:
+                    print(f"{row['id']}: {row['title']}")
+                    print(f"  {row['detail']}")
+            return 0
+        if args.playbook_cmd == "roadmap":
+            items = build_seed_roadmap(
+                modality=args.modality,
+                kind=args.kind,
+                baseline=args.baseline,
+                validation=args.validation,
+                shifts=args.shift,
+            )
+            if args.json:
+                print(json.dumps({"strategies": items}))
+            else:
+                for item in items:
+                    print(f"p{item['priority']}: {item['title']}")
+                    for line in item["plan"].splitlines():
+                        print(f"  {line}")
+                    print()
+            return 0
+        if args.playbook_cmd == "catalog":
+            print(
+                json.dumps(
+                    playbook_catalog(modality=args.modality, kind=args.kind),
+                    indent=2,
+                )
+            )
+            return 0
+        raise MymlfwError(
+            "PLAYBOOK_CMD",
+            "Unknown playbook subcommand.",
+            suggested_fix="Use strategies, shifts, roadmap, or catalog.",
+        )
     if args.command == "archive-contest":
         from mymlfw.scaffold import archive_contest
 

@@ -36,6 +36,7 @@ Canonical human lock: [`saas-api.md`](saas-api.md). Source of features: Campaign
 | Filter all\|kaggle\|standalone + search | Studio home | (client filter on list) | `/studio` filter + search | ok |
 | Share from list | Studio Share | `POST /v1/projects/{id}/share` | list Share | ok |
 | New project wizard | Studio New project | `POST /v1/projects` (+ optional `…/roadmap`, `…/progress` seed) | `#studio/new` DS playbook wizard | ok |
+| Playbook catalog | Wizard Strategies | `GET /v1/playbook/catalog` | `#studio/new` Strategies (shared w/ CLI) | ok |
 | Invite member | Studio invite | `POST /v1/projects/{id}/invite` | list Invite + TRUST | ok |
 | Soft-delete / archive (owner) | Studio archive | `POST /v1/projects/{id}/archive` | list Archive | ok |
 | Settings link / Logout | Studio header | `GET /v1/settings` (+ `/v1/me`) + local token clear | header Settings / Log out | ok |

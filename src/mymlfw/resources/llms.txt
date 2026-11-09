@@ -65,6 +65,11 @@ from mymlfw.scaffold import new_contest
 CLI python -m mymlfw recipes --match ranking
 from mymlfw.scaffold import list_recipes
 
+CLI python -m mymlfw playbook strategies --modality tabular
+CLI python -m mymlfw playbook shifts --modality tabular --kind kaggle
+CLI python -m mymlfw playbook roadmap --modality tabular --kind standalone --shift synth_gpt_tabular
+from mymlfw.playbook import modality_strategies, paradigm_shifts, playbook_catalog
+
 CLI python -m mymlfw archive-contest --ledger ledger/experiments.csv --playbook recipes/GRANDMASTER_PLAYBOOK.md
 from mymlfw.scaffold import archive_contest
 

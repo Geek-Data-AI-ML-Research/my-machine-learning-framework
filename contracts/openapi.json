@@ -4227,6 +4227,174 @@
         "title": "PersonaSwitchRequest",
         "type": "object"
       },
+      "PlaybookCatalogResponse": {
+        "additionalProperties": false,
+        "description": "Shared DS playbook catalog for Studio wizard + agents.",
+        "properties": {
+          "all_paradigm_shifts": {
+            "items": {
+              "$ref": "#/components/schemas/PlaybookShiftItem"
+            },
+            "title": "All Paradigm Shifts",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "kaggle",
+              "standalone"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modalities",
+            "type": "array"
+          },
+          "modality": {
+            "enum": [
+              "tabular",
+              "text",
+              "vision",
+              "sequential"
+            ],
+            "title": "Modality",
+            "type": "string"
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Order",
+            "type": "array"
+          },
+          "paradigm_shifts": {
+            "items": {
+              "$ref": "#/components/schemas/PlaybookShiftItem"
+            },
+            "title": "Paradigm Shifts",
+            "type": "array"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/PlaybookStrategyItem"
+            },
+            "title": "Strategies",
+            "type": "array"
+          },
+          "strategies_by_modality": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/PlaybookStrategyItem"
+              },
+              "type": "array"
+            },
+            "title": "Strategies By Modality",
+            "type": "object"
+          }
+        },
+        "required": [
+          "modality",
+          "kind"
+        ],
+        "title": "PlaybookCatalogResponse",
+        "type": "object"
+      },
+      "PlaybookShiftItem": {
+        "additionalProperties": false,
+        "description": "Optional paradigm shift gated after Stages 1\u20133.",
+        "properties": {
+          "detail": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "venues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Venues",
+            "type": "array"
+          },
+          "when": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "When",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "detail",
+          "when"
+        ],
+        "title": "PlaybookShiftItem",
+        "type": "object"
+      },
+      "PlaybookStrategyItem": {
+        "additionalProperties": false,
+        "description": "One rung on a modality strategy ladder.",
+        "properties": {
+          "detail": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "default",
+              "escalate",
+              "paradigm"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tier",
+          "title",
+          "detail"
+        ],
+        "title": "PlaybookStrategyItem",
+        "type": "object"
+      },
       "ProgressNoteCreate": {
         "additionalProperties": false,
         "description": "Daily progress note (CLI ``progress add --note``).",
@@ -7555,6 +7723,76 @@
         "summary": "Terminate Runner",
         "tags": [
           "cloud"
+        ]
+      }
+    },
+    "/v1/playbook/catalog": {
+      "get": {
+        "description": "DS strategy ladder + paradigm shifts (shared with ``mymlfw playbook`` CLI).",
+        "operationId": "get_playbook_catalog_v1_playbook_catalog_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "modality",
+            "required": false,
+            "schema": {
+              "default": "tabular",
+              "title": "Modality",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "standalone",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybookCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Playbook Catalog",
+        "tags": [
+          "brain"
         ]
       }
     },

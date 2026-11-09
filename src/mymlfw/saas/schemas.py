@@ -969,6 +969,41 @@ class ProjectCreate(ApiModel):
     git_remote: Annotated[str, Field(default="", max_length=500)] = ""
 
 
+class PlaybookStrategyItem(ApiModel):
+    """One rung on a modality strategy ladder."""
+
+    id: Annotated[str, Field(min_length=1, max_length=64)]
+    tier: Literal["default", "escalate", "paradigm"]
+    title: Annotated[str, Field(min_length=1, max_length=240)]
+    detail: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+class PlaybookShiftItem(ApiModel):
+    """Optional paradigm shift gated after Stages 1–3."""
+
+    id: Annotated[str, Field(min_length=1, max_length=64)]
+    title: Annotated[str, Field(min_length=1, max_length=240)]
+    detail: Annotated[str, Field(min_length=1, max_length=2000)]
+    when: Annotated[str, Field(min_length=1, max_length=32)]
+    venues: list[str] = Field(default_factory=list)
+
+
+class PlaybookCatalogResponse(ApiModel):
+    """Shared DS playbook catalog for Studio wizard + agents."""
+
+    modality: Literal["tabular", "text", "vision", "sequential"]
+    kind: Literal["kaggle", "standalone"]
+    strategies: list[PlaybookStrategyItem] = Field(default_factory=list)
+    paradigm_shifts: list[PlaybookShiftItem] = Field(default_factory=list)
+    modalities: list[str] = Field(default_factory=list)
+    kinds: list[str] = Field(default_factory=list)
+    order: list[str] = Field(default_factory=list)
+    strategies_by_modality: dict[str, list[PlaybookStrategyItem]] = Field(
+        default_factory=dict
+    )
+    all_paradigm_shifts: list[PlaybookShiftItem] = Field(default_factory=list)
+
+
 class ProjectInviteCreate(ApiModel):
     """Studio invite / CLI ``project invite``."""
 
