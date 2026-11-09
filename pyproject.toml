@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mymlfw"
-version = "0.1.0"
+version = "0.2.0"
 description = "Campaign, blend, and submission toolkit for ML and Kaggle work."
 requires-python = ">=3.11"
 dependencies = [

@@ -1,6 +1,6 @@
 # mymlfw
 
-Local toolkit for ML and Kaggle contests. Version 0.1.0. It keeps one experiment ledger, checks blends and submissions, and gives a coding agent a memory of what already failed. The same repo also ships a **Campaign SaaS** control plane (API, Studio web, MCP, worker) for multi-project campaigns.
+Local toolkit for ML and Kaggle contests. Version **0.2.0**. It keeps one experiment ledger, checks blends and submissions, and gives a coding agent a memory of what already failed. The same repo also ships a **Campaign SaaS** control plane (API, Studio web, MCP, worker) plus a shared **DS playbook** (`mymlfw playbook` / Studio New project wizard) for modality strategies and paradigm shifts.
 
 This repository is the documentation and the package. Human reading starts at [docs/index.md](docs/index.md). Coding agents read [llms.txt](llms.txt), then [AGENTS.md](AGENTS.md).
 

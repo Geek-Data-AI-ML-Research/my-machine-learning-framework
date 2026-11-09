@@ -64,12 +64,12 @@ async def test_api_dashboard_includes_empty_typed_panels():
         login = await client.post(
             "/v1/auth/login",
             json={"email": "owner@localhost", "password": "devpassword"},
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         assert login.status_code == 200
         headers = {
             "Authorization": f"Bearer {login.json()['access_token']}",
-            "X-Mymlfw-Client-Version": "0.1.0",
+            "X-Mymlfw-Client-Version": "0.2.0",
             "Idempotency-Key": "dash-panels-1",
         }
         created = await client.post(

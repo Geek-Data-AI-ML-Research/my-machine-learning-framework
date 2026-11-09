@@ -48,12 +48,12 @@ async def test_report_mcp_gap_tool_and_api_list():
         login = await client.post(
             "/v1/auth/login",
             json={"email": "owner@localhost", "password": "devpassword"},
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         token = login.json()["access_token"]
         headers_api = {
             "Authorization": f"Bearer {token}",
-            "X-Mymlfw-Client-Version": "0.1.0",
+            "X-Mymlfw-Client-Version": "0.2.0",
             "Idempotency-Key": "gap-api-1",
         }
         posted = await client.post(
@@ -71,7 +71,7 @@ async def test_report_mcp_gap_tool_and_api_list():
             "/v1/orgs/current/mcp-gaps",
             headers={
                 "Authorization": f"Bearer {token}",
-                "X-Mymlfw-Client-Version": "0.1.0",
+                "X-Mymlfw-Client-Version": "0.2.0",
             },
         )
         assert listed_api.status_code == 200

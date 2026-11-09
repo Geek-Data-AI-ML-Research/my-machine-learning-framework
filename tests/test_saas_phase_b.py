@@ -202,13 +202,13 @@ async def test_api_demo_dashboard_and_share():
         login = await client.post(
             "/v1/auth/login",
             json={"email": "owner@localhost", "password": "devpassword"},
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         assert login.status_code == 200, login.text
         token = login.json()["access_token"]
         headers = {
             "Authorization": f"Bearer {token}",
-            "X-Mymlfw-Client-Version": "0.1.0",
+            "X-Mymlfw-Client-Version": "0.2.0",
         }
 
         created = await client.post(
@@ -255,7 +255,7 @@ async def test_api_demo_dashboard_and_share():
         snap = share.json()
         pub = await client.get(
             f"/v1/public/{snap['org_slug']}/{snap['slug']}",
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         assert pub.status_code == 200
         assert "workspace_id" not in pub.json()["redacted"]

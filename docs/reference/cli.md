@@ -1,6 +1,6 @@
 # CLI
 
-Reference for mymlfw 0.1.0. The program is `python -m mymlfw`. `--debug` adds a traceback field to the error JSON. Every other failure is one JSON object on stderr with `error_code` and `suggested_fix`, and the process exits 1.
+Reference for mymlfw 0.2.0. The program is `python -m mymlfw`. `--debug` adds a traceback field to the error JSON. Every other failure is one JSON object on stderr with `error_code` and `suggested_fix`, and the process exits 1.
 
 Flags below are the ones the parser requires or commonly takes. Defaults are the argparse defaults.
 
@@ -8,7 +8,7 @@ Flags below are the ones the parser requires or commonly takes. Defaults are the
 
 | Command | Required | Notes |
 | --- | --- | --- |
-| `version` | | Prints `0.1.0`. |
+| `version` | | Prints `0.2.0`. |
 | `new-contest NAME --dest DIR` | `NAME`, `--dest` | Creates the tree in [Contest layout](contest-layout.md). |
 | `profile-data --dir DIR` | `--dir` | Writes a profile. `--out` sets the path. `--recommend` is accepted and changes nothing: recommendations are always written. |
 | `recipes --match TEXT` | | Substring match on recipe cards. `ranking` returns the ranking card only. |

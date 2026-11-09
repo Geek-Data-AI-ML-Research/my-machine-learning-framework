@@ -1,6 +1,6 @@
 # AGENTS.md
 
-mymlfw 0.1.0. Read `llms.txt` before editing a contest. Human documentation is [docs/index.md](docs/index.md).
+mymlfw 0.2.0. Read `llms.txt` before editing a contest. Human documentation is [docs/index.md](docs/index.md).
 
 Campaign SaaS work: also read partitioned AGENTS under `src/mymlfw/saas/`, `src/mymlfw/saas/db/`, `src/mymlfw/saas/rag/`, `src/mymlfw/mcp/`, and `web/`. Web UI stack: see `web/AGENTS.md` (Tailwind CSS + Charts.css; not ascii.rest).
 

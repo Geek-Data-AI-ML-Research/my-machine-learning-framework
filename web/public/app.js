@@ -150,7 +150,7 @@
       fetch(API + "/v1/events", {
         headers: {
           Authorization: "Bearer " + state.token,
-          "X-Mymlfw-Client-Version": "0.1.0",
+          "X-Mymlfw-Client-Version": "0.2.0",
           Accept: "text/event-stream",
         },
       })
@@ -177,7 +177,7 @@
 
   async function api(path, opts = {}) {
     const headers = Object.assign(
-      { "Content-Type": "application/json", "X-Mymlfw-Client-Version": "0.1.0" },
+      { "Content-Type": "application/json", "X-Mymlfw-Client-Version": "0.2.0" },
       opts.headers || {}
     );
     if (state.token) headers.Authorization = "Bearer " + state.token;

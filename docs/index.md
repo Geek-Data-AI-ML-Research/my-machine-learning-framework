@@ -1,6 +1,6 @@
 # mymlfw documentation
 
-Version 0.1.0. These pages follow the [Diátaxis](https://diataxis.fr/) split: a tutorial to learn the loop, how-to guides for one task, reference for lookup, and explanation for why the pieces are separated.
+Version 0.2.0. These pages follow the [Diátaxis](https://diataxis.fr/) split: a tutorial to learn the loop, how-to guides for one task, reference for lookup, and explanation for why the pieces are separated.
 
 | If you are | Start here |
 | --- | --- |
@@ -28,7 +28,7 @@ Task-oriented. Each page assumes the tutorial is done.
 - [Blend and gate a submission](how-to/blend-and-gate.md)
 - [Remember, ingest, and search](how-to/use-memory.md)
 - [Run the Campaign SaaS stack](how-to/run-campaign-saas.md)
-- [Start a Studio project with the DS playbook wizard](how-to/studio-new-project-wizard.md)
+- [Start a Studio project with the DS playbook wizard](how-to/studio-new-project-wizard.md) — also `python -m mymlfw playbook …`
 - [Connect cloud runners (RunPod / AWS)](how-to/connect-cloud-runners.md)
 - [MCP walking skeleton](how-to/mcp-walking-skeleton.md)
 - [Keep a Studio project updated via MCP](how-to/agent-mcp-campaign-sync.md)

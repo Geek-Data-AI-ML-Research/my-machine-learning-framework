@@ -66,12 +66,12 @@ async def test_brain_routes_use_memory_when_mongo_unset():
         login = await client.post(
             "/v1/auth/login",
             json={"email": "owner@localhost", "password": "devpassword"},
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         token = login.json()["access_token"]
         headers = {
             "Authorization": f"Bearer {token}",
-            "X-Mymlfw-Client-Version": "0.1.0",
+            "X-Mymlfw-Client-Version": "0.2.0",
         }
         gone = await client.post("/v1/studio/ensure-demo", headers=headers)
         assert gone.status_code == 404
@@ -126,12 +126,12 @@ async def test_mongo_project_survives_new_app_instance():
             login = await client.post(
                 "/v1/auth/login",
                 json={"email": "owner@localhost", "password": "devpassword"},
-                headers={"X-Mymlfw-Client-Version": "0.1.0"},
+                headers={"X-Mymlfw-Client-Version": "0.2.0"},
             )
             token = login.json()["access_token"]
             headers = {
                 "Authorization": f"Bearer {token}",
-                "X-Mymlfw-Client-Version": "0.1.0",
+                "X-Mymlfw-Client-Version": "0.2.0",
             }
             created = await client.post(
                 "/v1/projects",
@@ -169,12 +169,12 @@ async def test_mongo_project_survives_new_app_instance():
             login = await client.post(
                 "/v1/auth/login",
                 json={"email": "owner@localhost", "password": "devpassword"},
-                headers={"X-Mymlfw-Client-Version": "0.1.0"},
+                headers={"X-Mymlfw-Client-Version": "0.2.0"},
             )
             token = login.json()["access_token"]
             headers = {
                 "Authorization": f"Bearer {token}",
-                "X-Mymlfw-Client-Version": "0.1.0",
+                "X-Mymlfw-Client-Version": "0.2.0",
             }
             listed = await client.get("/v1/projects", headers=headers)
             assert listed.status_code == 200

@@ -23,13 +23,13 @@ async def studio_client():
         login = await client.post(
             "/v1/auth/login",
             json={"email": "owner@localhost", "password": "devpassword"},
-            headers={"X-Mymlfw-Client-Version": "0.1.0"},
+            headers={"X-Mymlfw-Client-Version": "0.2.0"},
         )
         assert login.status_code == 200, login.text
         token = login.json()["access_token"]
         headers = {
             "Authorization": f"Bearer {token}",
-            "X-Mymlfw-Client-Version": "0.1.0",
+            "X-Mymlfw-Client-Version": "0.2.0",
             "Idempotency-Key": "studio-test-1",
         }
         yield client, headers
